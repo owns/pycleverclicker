@@ -16,6 +16,11 @@ hexS = hex(l)
 print('color at',x,y,'is',hexS)
 """
 
+# simply threading...
+#http://stackoverflow.com/questions/16745507/tkinter-how-to-use-threads-to-preventing-main-event-loop-from-freezing
+
+
+
 if __name__ == '__main__':
     from myloggingbase import MyLoggingBase
     MyLoggingBase.init_logging(file_log_lvl=None,show_warning=False)
@@ -23,12 +28,18 @@ if __name__ == '__main__':
     logger.debug('hello world')
     logger.info(MyLoggingBase.get_output_fd())
     
-    #import pyautogui # https://github.com/asweigart/pyautogui
-    #pyautogui.PAUSE = 0
-    #pyautogui.moveTo(10,10)
+    
+    # click w/ mouse
+#    from pynput.mouse import Button, Controller #https://pypi.python.org/pypi/pynput
+#    import time
+#     logger.info('looping...')
+#     mouse = Controller()
+#     while True:
+#         mouse.click(Button.left)
+#         time.sleep(0.8)
+#     logger.info('done')
     
     from mytkapplication import MyTkApplication
-    #root = tk.Tk()
-    app = MyTkApplication()#master=root)
-    #app.mainloop()
+    app = MyTkApplication()
+    app.mainloop()
     
