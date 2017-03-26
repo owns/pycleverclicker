@@ -3,7 +3,6 @@
 	<name>pycleverclicker</name>
 	<comment></comment>
 	<projects>
-		<project>pymybase</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>
