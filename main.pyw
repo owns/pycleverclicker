@@ -1,5 +1,6 @@
+#!/usr/bin/env python3
 """
-@author: Elias Wood (owns13927@yahoo.com)
+@author: Elias Wood <owns13927@yahoo.com>
 Created on 2017-03-19
 main for application
 """
@@ -19,27 +20,16 @@ print('color at',x,y,'is',hexS)
 # simply threading...
 #http://stackoverflow.com/questions/16745507/tkinter-how-to-use-threads-to-preventing-main-event-loop-from-freezing
 
-
-
 if __name__ == '__main__':
-    from myloggingbase import MyLoggingBase
+    # init logging and get main logger
+    from pymybase.myloggingbase import MyLoggingBase
     MyLoggingBase.init_logging(file_log_lvl=None,show_warning=False)
     logger = MyLoggingBase().logger
-    logger.debug('hello world')
-    logger.info(MyLoggingBase.get_output_fd())
     
-    
-    # click w/ mouse
-#    from pynput.mouse import Button, Controller #https://pypi.python.org/pypi/pynput
-#    import time
-#     logger.info('looping...')
-#     mouse = Controller()
-#     while True:
-#         mouse.click(Button.left)
-#         time.sleep(0.8)
-#     logger.info('done')
-    
+    # start app
+    logger.info('start')
     from mytkapplication import MyTkApplication
     app = MyTkApplication()
     app.mainloop()
+    logger.info('done')
     
