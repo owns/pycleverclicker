@@ -35,6 +35,7 @@ class MyInputRecorder(Thread,MyLoggingBase):
     # on_click
     #===========================================================================
     def on_click(self,x,y,button,pressed):
+        if not self.__continue_running: return False # stop
         if not pressed:
             with self.__time_lock:
                 t = time.time()
@@ -47,6 +48,8 @@ class MyInputRecorder(Thread,MyLoggingBase):
     # on_release
     #===========================================================================
     def on_release(self,key):
+        if not self.__continue_running: return False # stop
+        # valid key (we want?)
         if key not in keyboard.Key:
             k = key.char
             if not k.isalnum(): # or k != k.lower():
@@ -98,10 +101,15 @@ class MyInputRecorder(Thread,MyLoggingBase):
         #=======================================================================
         # stop listeners
         #=======================================================================
+        # NOTE: ubuntu will wait for input before really stopping ...
         list_m.stop()
-        list_k.stop()
+        mouse.Controller().move(1,1) # ubuntu will wait for input before really stopping ...
         self.logger.debug('joining mouse listener...')
         list_m.join()
+        list_k.stop()
+        k = keyboard.Controller()
+        k.press(keyboard.Key.shift)
+        k.release(keyboard.Key.shift)
         self.logger.debug('joining keyboard listener...')
         list_k.join()
             
