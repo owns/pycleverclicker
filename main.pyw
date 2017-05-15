@@ -18,18 +18,23 @@ print('color at',x,y,'is',hexS)
 """
 
 # simply threading...
-#http://stackoverflow.com/questions/16745507/tkinter-how-to-use-threads-to-preventing-main-event-loop-from-freezing
+#http://stackoverflow.com/questions/16745507/tkinter-how-to-use-threads-to-preventing-main-event-loop-from-freezing pylint: disable=line-too-long
 
-if __name__ == '__main__':
+def main():
+    """main application"""
     # init logging and get main logger
     from pymybase.myloggingbase import MyLoggingBase
     MyLoggingBase.init_logging(file_log_lvl=None,show_warning=False)
     logger = MyLoggingBase().logger
-    
+
     # start app
     logger.info('start')
     from mytkapplication import MyTkApplication
     app = MyTkApplication()
     app.mainloop()
     logger.info('done')
-    
+
+#===============================================================================
+# run main
+#===============================================================================
+if __name__ == '__main__': main()

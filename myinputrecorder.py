@@ -6,66 +6,114 @@ Created on 2017-03-26
 """
 
 import time
-from pynput import mouse
-from pynput import keyboard
+from threading import Thread, Lock
+from pynput import mouse, keyboard
 
 from pymybase.myloggingbase import MyLoggingBase
-from threading import Thread
-from threading import Lock
 
 class MyInputRecorder(Thread,MyLoggingBase):
+    """handle recording mouse and keyboard input"""
 
     __continue_running = True
     __queue = None
     __time_lock = None
+    __key_lock = None
+    __pressed_keys = None
     __last_time = None
-    
+    log_clicks = False
+    log_keys = False
+    ignore_key_press = False # track time a key is pressed
+
     IGNORE_KEYS = (keyboard.Key.shift,keyboard.Key.shift_l,keyboard.Key.shift_r,
                    keyboard.Key.ctrl,keyboard.Key.ctrl_l,keyboard.Key.ctrl_r,
                    keyboard.Key.alt,keyboard.Key.alt_gr,keyboard.Key.alt_l,keyboard.Key.alt_r,
                    keyboard.Key.cmd,keyboard.Key.cmd_l,keyboard.Key.cmd_r)
-    
+
     def __init__(self,actions_queue,*args,**keys):
         MyLoggingBase.__init__(self,*args,**keys)
         Thread.__init__(self,*args,**keys)
-        
+
         self.__queue = actions_queue
-    
+        self.__time_lock = Lock()
+        self.__key_lock = Lock()
+
     #===========================================================================
     # on_click
     #===========================================================================
-    def on_click(self,x,y,button,pressed):
+    def on_click(self,x_pos,y_pos,button,pressed):
+        """handle mouse click events"""
         if not self.__continue_running: return False # stop
-        if not pressed:
-            with self.__time_lock:
-                t = time.time()
-                if not self.__last_time: self.__last_time = t
-                self.__queue.put_nowait(dict(type='mouse',name=button.name,pos=(x,y),time=t-self.__last_time))
+        if self.log_clicks: self.logger.debug('mouse %s click %s at [%s,%s]',
+                button.name,'pressed' if pressed else 'released',x_pos,y_pos)
+        if not pressed: # only trigger releases (up)
+            with self.__time_lock: #pylint: disable=not-context-manager
+                new_time = time.time()
+                if not self.__last_time: self.__last_time = new_time
+                self.__queue.put_nowait(dict(type='mouse',name=button.name,
+                                             pos=(x_pos,y_pos),time=new_time-self.__last_time))
                 #self.__queue.put_nowait('{0!s} click at {1!s}'.format(button.name,(x,y)))
-                self.__last_time = t
-    
+                self.__last_time = new_time
+
+    #===========================================================================
+    # on_press
+    #===========================================================================
+    def on_press(self,key):
+        """handle key press"""
+        if not self.__continue_running: return False # stop listener
+        if self.ignore_key_press: return None # do nothing
+
+        # valid key (we want)?
+        if key in keyboard.Key:
+            if key in self.IGNORE_KEYS: return None # stop
+        else:
+            k = key.char
+            if not k.isalnum(): # or k != k.lower():
+                self.logger.warning('invalid key %r',key)
+                return None # stop
+
+        if self.log_keys:
+            self.logger.debug('key %s pressed',key.name if hasattr(key,'name') else key.char)
+
+        # track time when pressed
+        name =  key.char if hasattr(key,'char') else key.name
+        with self.__key_lock: #pylint: disable=not-context-manager
+            self.__pressed_keys.setdefault(name,time.time())
+
     #===========================================================================
     # on_release
     #===========================================================================
     def on_release(self,key):
+        """handle key release"""
         if not self.__continue_running: return False # stop
-        # valid key (we want?)
-        if key not in keyboard.Key:
+        # valid key (we want)?
+        if key in keyboard.Key:
+            if key in self.IGNORE_KEYS: return None # stop
+        else:
             k = key.char
             if not k.isalnum(): # or k != k.lower():
-                self.logger.warn('invalid key %r',key)
+                self.logger.warning('invalid key %r',key)
                 return None # stop
-        
-        with self.__time_lock:
-            t = time.time()
-            if not self.__last_time: self.__last_time = t
-            try: self.__queue.put_nowait(dict(type='type',name=key.char,time=t-self.__last_time))
-            except AttributeError:
-                if key not in self.IGNORE_KEYS:
-                    self.__queue.put_nowait(dict(type='type',name=key.name,time=t-self.__last_time))
-                    self.__last_time = t
-            else: self.__last_time = t
-    
+
+        if self.log_keys:
+            self.logger.debug('key %s released',key.name if hasattr(key,'name') else key.char)
+
+        with self.__time_lock: #pylint: disable=not-context-manager
+            #  name (unique name) of key pressed
+            name=key.char if hasattr(key,'char') else key.name
+            # time sense last action?
+            new_time = time.time()
+            if not self.__last_time: self.__last_time = new_time
+            # how long was it pressed?
+            if self.ignore_key_press: pressed = 0
+            else:
+                with self.__key_lock: #pylint: disable=not-context-manager
+                    pressed = new_time - self.__pressed_keys.pop(name,new_time)
+            # add to queue
+            self.__queue.put_nowait(dict(type='type',time=new_time-self.__last_time,
+                                         pressed=pressed,name=name))
+            # store time for next action
+            self.__last_time = new_time
+
     #===========================================================================
     # STOP
     #===========================================================================
@@ -73,31 +121,32 @@ class MyInputRecorder(Thread,MyLoggingBase):
         """ start stopping ..."""
         self.logger.debug('told to stop')
         self.__continue_running = False
-        
+
     #===========================================================================
     # RUN
     #===========================================================================
     def run(self):
         """ do work here """
         self.logger.debug('start')
-        self.__time_lock = Lock()
+        self.__pressed_keys = dict()
         self.__last_time = None
-        
+
         #=======================================================================
         # # start listeners
         #=======================================================================
         list_m = mouse.Listener(on_click=self.on_click)
         list_m.start()
         list_m.wait()
-        list_k = keyboard.Listener(on_release=self.on_release)
+        list_k = keyboard.Listener(on_release=self.on_release,
+                                   on_press=self.on_press)
         list_k.start()
         list_k.wait()
-        
+
         #=======================================================================
         # wait to stop
         #=======================================================================
         while self.__continue_running: time.sleep(.5)
-        
+
         #=======================================================================
         # stop listeners
         #=======================================================================
@@ -112,13 +161,10 @@ class MyInputRecorder(Thread,MyLoggingBase):
         k.release(keyboard.Key.shift)
         self.logger.debug('joining keyboard listener...')
         list_k.join()
-            
+
         self.logger.debug('stop')
-        
-        
-        
-        
-        
-        
-        
-        
+
+
+
+
+
