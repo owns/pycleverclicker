@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 @author: Elias Wood <owns13927@yahoo.com>
 Created on 2017-03-26
@@ -6,7 +7,7 @@ store,export,import,iter through scripts
 """
 
 #import time
-from pymybase.myloggingbase import MyLoggingBase
+from packages.pymybase.myloggingbase import MyLoggingBase
 
 class MyInputData(list,MyLoggingBase):
     """class to hold input value - to be passed around"""

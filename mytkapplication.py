@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 @author: Elias Wood <owns13927@yahoo.com>
 Created on 2017-03-19
@@ -8,7 +9,7 @@ Created on 2017-03-19
 import tkinter as tk
 from tkinter import messagebox
 import queue
-from pymybase.myloggingbase import MyLoggingBase
+from packages.pymybase.myloggingbase import MyLoggingBase
 from myinputrecorder import MyInputRecorder
 from myinputdata import MyInputData
 
@@ -17,7 +18,7 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
     DEFAULT_TITLE = 'PyCleverClicker'
     DEFAULT_ABOUT_TXT = ('By: owns <owns13927@yahoo.com>\n'+
                          'Created: 2017-03-19\n'+
-                         'Modified: 2017-03-31\n'+
+                         'Modified: 2018-02-06\n'+
                          '')
     __status = None
     __next_action = None

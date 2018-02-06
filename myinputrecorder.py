@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 @author: Elias Wood <owns13927@yahoo.com>
 Created on 2017-03-26
@@ -9,7 +10,7 @@ import time
 from threading import Thread, Lock
 from pynput import mouse, keyboard
 
-from pymybase.myloggingbase import MyLoggingBase
+from packages.pymybase.myloggingbase import MyLoggingBase
 
 class MyInputRecorder(Thread,MyLoggingBase):
     """handle recording mouse and keyboard input"""

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 @author: Elias Wood <owns13927@yahoo.com>
 Created on 2017-03-19
@@ -23,7 +24,7 @@ print('color at',x,y,'is',hexS)
 def main():
     """main application"""
     # init logging and get main logger
-    from pymybase.myloggingbase import MyLoggingBase
+    from packages.pymybase.myloggingbase import MyLoggingBase
     MyLoggingBase.init_logging(file_log_lvl=None,show_warning=False)
     logger = MyLoggingBase().logger
 
