@@ -5,5 +5,7 @@
 ## Changed
 - refactored following pylint
 - pymybase located in packages module
+## Bug
+- no keyboard long hold???
 ## Fixed
 ## Removed

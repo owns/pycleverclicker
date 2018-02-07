@@ -21,8 +21,8 @@ class MyInputRecorder(Thread,MyLoggingBase):
     __key_lock = None
     __pressed_keys = None
     __last_time = None
-    log_clicks = False
-    log_keys = False
+    log_clicks = True
+    log_keys = True
     ignore_key_press = False # track time a key is pressed
 
     IGNORE_KEYS = (keyboard.Key.shift,keyboard.Key.shift_l,keyboard.Key.shift_r,
@@ -72,6 +72,7 @@ class MyInputRecorder(Thread,MyLoggingBase):
                 self.logger.warning('invalid key %r',key)
                 return None # stop
 
+        # if we're logging keys and this is the first time it's been pressed, log it!
         if self.log_keys:
             self.logger.debug('key %s pressed',key.name if hasattr(key,'name') else key.char)
 
@@ -120,7 +121,7 @@ class MyInputRecorder(Thread,MyLoggingBase):
     #===========================================================================
     def stop(self):
         """ start stopping ..."""
-        self.logger.debug('told to stop')
+        self.logger.info('told to stop')
         self.__continue_running = False
 
     #===========================================================================
@@ -128,7 +129,7 @@ class MyInputRecorder(Thread,MyLoggingBase):
     #===========================================================================
     def run(self):
         """ do work here """
-        self.logger.debug('start')
+        self.logger.info('started')
         self.__pressed_keys = dict()
         self.__last_time = None
 
@@ -157,13 +158,13 @@ class MyInputRecorder(Thread,MyLoggingBase):
         self.logger.debug('joining mouse listener...')
         list_m.join()
         list_k.stop()
-        k = keyboard.Controller()
+        k = keyboard.Controller() # ubuntu will wait for input before really stopping ...
         k.press(keyboard.Key.shift)
         k.release(keyboard.Key.shift)
         self.logger.debug('joining keyboard listener...')
         list_k.join()
 
-        self.logger.debug('stop')
+        self.logger.info('stopped')
 
 
 

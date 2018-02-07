@@ -25,7 +25,7 @@ def main():
     """main application"""
     # init logging and get main logger
     from packages.pymybase.myloggingbase import MyLoggingBase
-    MyLoggingBase.init_logging(file_log_lvl=None,show_warning=False)
+    MyLoggingBase.init_logging(file_log_lvl='DEBUG',file_log_name='pycleverclicker.log')
     logger = MyLoggingBase().logger
 
     # start app
@@ -33,6 +33,7 @@ def main():
     from mytkapplication import MyTkApplication
     app = MyTkApplication()
     app.mainloop()
+    app.destroy()
     logger.info('done')
 
 #===============================================================================

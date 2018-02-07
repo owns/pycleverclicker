@@ -59,13 +59,15 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
     #===========================================================================
     # Clean up!!!
     #===========================================================================
-    def on_quit(self, evt=None): #pylint: disable=unused-argument
+    def on_quit(self, evt=None): #@UnusedVariable #pylint: disable=unused-argument
         """run on quit  """
         self.logger.debug('cleaning ...')
         if self.__recorder:
+            #messagebox.showerror('Not Implemented', 'This feature has net yet been built!')
             if self.__recorder.is_alive():
                 self.__recorder.stop()
                 self.__recorder.join()
+        self.quit()
 
     #===========================================================================
     # createFrame - build menu bar
@@ -90,7 +92,7 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
                               accelerator='Ctrl+Shift+S')
         self.bind_all('<Control-Shift-S>',self.not_implemented)
         file_menu.add_separator()
-        file_menu.add_command(label='Exit',command=self.master.destroy,
+        file_menu.add_command(label='Exit',command=self.on_quit,
                               underline=1,accelerator='Ctrl+Q')
         self.bind_all('<Control-q>',self.on_quit)
         menu_bar.add_cascade(label='File',menu=file_menu,underline=0)
@@ -125,7 +127,9 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
         #=======================================================================
         # Binds
         #=======================================================================
-        self.bind('<Destroy>',self.on_quit)
+        #self.bind('<Destroy>', self.on_quit)
+        #TODO: test close action in ubuntu
+        self.master.protocol("WM_DELETE_WINDOW", self.on_quit)
 
         #=======================================================================
         # MenuBar
@@ -180,11 +184,12 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
     def record(self,evt=None):
         """ start/stop recording..."""
         if self.btn_record['state'] == tk.DISABLED: return None # stop!
-        self.logger.info('clicked recording:%s',bool(self.__recorder))
-        if self.__recorder: self._stop_recording(evt)
-        else: self._start_recording(evt)
+        self.logger.info('clicked - %s ...','stopping' if bool(self.__recorder) else 'recording')
+        if self.__recorder: self.stop_recording(evt)
+        else: self.start_recording(evt)
 
-    def _start_recording(self,evt=None): #pylint: disable=unused-argument
+    def start_recording(self,evt=None): #@UnusedVariable #pylint: disable=unused-argument
+        """start recording actions"""
         if self.__recorder: raise RuntimeError('tried to start recording while already recording!')
         # format and prep
         self.btn_record.config(text=' '.join(
@@ -222,7 +227,8 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
         if self.__recorder:
             self.after(100,self._handle_record_action)
 
-    def _stop_recording(self,evt=None): #pylint: disable=unused-argument
+    def stop_recording(self,evt=None): #@UnusedVariable #pylint: disable=unused-argument
+        """stop recording actions"""
         if not self.__recorder: raise RuntimeError('tried to stop recording while not recording!')
         # format and prep
         self.btn_record.config(text=' '.join(
@@ -239,7 +245,7 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
     #===========================================================================
     # Run
     #===========================================================================
-    def run(self,evt=None): #pylint: disable=unused-argument
+    def run(self,evt=None): #@UnusedVariable #pylint: disable=unused-argument
         """ run currently loaded script..."""
         if self.btn_run['state'] == tk.DISABLED: return None # stop!
         self.logger.info('start')
@@ -287,29 +293,3 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
     def set_status(self,msg,*args):
         """set the status"""
         self.__status.set(msg.format(*args))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
