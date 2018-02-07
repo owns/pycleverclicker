@@ -33,7 +33,6 @@ def main():
     from mytkapplication import MyTkApplication
     app = MyTkApplication()
     app.mainloop()
-    app.destroy()
     logger.info('done')
 
 #===============================================================================
