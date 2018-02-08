@@ -72,14 +72,16 @@ class MyInputRecorder(Thread,MyLoggingBase):
                 self.logger.warning('invalid key %r',key)
                 return None # stop
 
-        # if we're logging keys and this is the first time it's been pressed, log it!
-        if self.log_keys:
-            self.logger.debug('key %s pressed',key.name if hasattr(key,'name') else key.char)
 
         # track time when pressed
         name =  key.char if hasattr(key,'char') else key.name
         with self.__key_lock: #pylint: disable=not-context-manager
-            self.__pressed_keys.setdefault(name,time.time())
+            cur_time = time.time()
+            set_time = self.__pressed_keys.setdefault(name,cur_time)
+        
+        # if we're logging keys and this is the first time it's been pressed, log it!
+        if self.log_keys and cur_time == set_time:
+            self.logger.debug('key %s pressed',key.name if hasattr(key,'name') else key.char)
 
     #===========================================================================
     # on_release
