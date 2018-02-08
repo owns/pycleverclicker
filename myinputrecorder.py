@@ -17,6 +17,7 @@ class MyInputRecorder(Thread,MyLoggingBase):
 
     __continue_running = True
     __queue = None
+    __stop_fn = None
     __time_lock = None
     __key_lock = None
     __pressed_keys = None
@@ -24,17 +25,20 @@ class MyInputRecorder(Thread,MyLoggingBase):
     log_clicks = True
     log_keys = True
     ignore_key_press = False # track time a key is pressed
-
+    
+    __is_shift = None
+    
     IGNORE_KEYS = (keyboard.Key.shift,keyboard.Key.shift_l,keyboard.Key.shift_r,
                    keyboard.Key.ctrl,keyboard.Key.ctrl_l,keyboard.Key.ctrl_r,
                    keyboard.Key.alt,keyboard.Key.alt_gr,keyboard.Key.alt_l,keyboard.Key.alt_r,
                    keyboard.Key.cmd,keyboard.Key.cmd_l,keyboard.Key.cmd_r)
 
-    def __init__(self,actions_queue,*args,**keys):
+    def __init__(self,actions_queue,stop_fn,*args,**keys):
         MyLoggingBase.__init__(self,*args,**keys)
         Thread.__init__(self,*args,**keys)
 
         self.__queue = actions_queue
+        self.__stop_fn = stop_fn
         self.__time_lock = Lock()
         self.__key_lock = Lock()
 
@@ -61,6 +65,9 @@ class MyInputRecorder(Thread,MyLoggingBase):
     def on_press(self,key):
         """handle key press"""
         if not self.__continue_running: return False # stop listener
+        
+        if key == keyboard.Key.shift: self.__is_shift = True
+        
         if self.ignore_key_press: return None # do nothing
 
         # valid key (we want)?
@@ -69,6 +76,10 @@ class MyInputRecorder(Thread,MyLoggingBase):
         else:
             k = key.char
             if not k.isalnum(): # or k != k.lower():
+                if self.__is_shift and key == keyboard.KeyCode(char='\x12'): #ctrl+r
+                    #TODO: send button evt?
+                    self.logger.warning('needs work!!!')
+                    return None # stop listener
                 self.logger.warning('invalid key %r',key)
                 return None # stop
 
@@ -89,6 +100,9 @@ class MyInputRecorder(Thread,MyLoggingBase):
     def on_release(self,key):
         """handle key release"""
         if not self.__continue_running: return False # stop
+        
+        if key == keyboard.Key.shift: self.__is_shift = False
+        
         # valid key (we want)?
         if key in keyboard.Key:
             if key in self.IGNORE_KEYS: return None # stop

@@ -201,7 +201,7 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
         # start recorder
         self.__input_list = MyInputData()
         self.__q = queue.Queue()
-        self.__recorder = MyInputRecorder(actions_queue=self.__q)
+        self.__recorder = MyInputRecorder(actions_queue=self.__q,stop_fn=self.stop_recording)
         self.__recorder.start()
         self.after(100,self._handle_record_action)
 
