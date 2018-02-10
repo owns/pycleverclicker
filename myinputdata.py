@@ -6,7 +6,7 @@ Created on 2017-03-26
 store,export,import,iter through scripts
 """
 
-#import time
+import json
 from packages.pymybase.myloggingbase import MyLoggingBase
 
 class MyInputData(list,MyLoggingBase):
@@ -17,11 +17,12 @@ class MyInputData(list,MyLoggingBase):
 
         list.__init__(self,*args,**keys)
 
-    def to_str(self):
+    def to_json(self):
         """serialize"""
-        raise NotImplementedError()
+        for i in self:
+            yield json.dumps(i, sort_keys=True, separators=(',', ':'))
 
-    def from_string(self):
+    def from_json(self, s):
         """de-serialize"""
         raise NotImplementedError()
 

@@ -12,6 +12,7 @@ import queue
 from packages.pymybase.myloggingbase import MyLoggingBase
 from myinputrecorder import MyInputRecorder
 from myinputdata import MyInputData
+import json
 
 class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instance-attributes
     """The Tk.Frame"""
@@ -143,6 +144,7 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
         self.btn_record = tk.Button(self,text='Record (Ctrl+Shift+R)',command=self.record)
         self.btn_record.grid(row=0,column=0,sticky=tk.N+tk.E+tk.S+tk.W)
         self.bind_all('<Control-Shift-R>',self.record)
+        self.bind_all('<<stop-recording>>',self.stop_recording)
         self.btn_run = tk.Button(self,text='Run (Ctrl+R)',command=self.run)
         self.btn_run.grid(row=0,column=1,sticky=tk.N+tk.E+tk.S+tk.W)
         self.bind_all('<Control-r>',self.run)
@@ -190,7 +192,9 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
 
     def start_recording(self,evt=None): #@UnusedVariable #pylint: disable=unused-argument
         """start recording actions"""
-        if self.__recorder: raise RuntimeError('tried to start recording while already recording!')
+        if self.__recorder:
+            self.logger.warning('tried to start recording while already recording!')
+            return # stop!
         # format and prep
         self.btn_record.config(text=' '.join(
             ['Stop']+self.btn_record['text'].split(' ')[1:]))
@@ -201,11 +205,11 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
         # start recorder
         self.__input_list = MyInputData()
         self.__q = queue.Queue()
-        self.__recorder = MyInputRecorder(actions_queue=self.__q,stop_fn=self.stop_recording)
+        self.__recorder = MyInputRecorder(root=self.master,actions_queue=self.__q)
         self.__recorder.start()
-        self.after(100,self._handle_record_action)
+        self.after(100,self.handle_record_action)
 
-    def _handle_record_action(self):
+    def handle_record_action(self):
         # anything in queue to process?
         not_empty = True
         while not_empty:
@@ -225,11 +229,13 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
 
         # continue?
         if self.__recorder:
-            self.after(100,self._handle_record_action)
+            self.after(100,self.handle_record_action)
 
     def stop_recording(self,evt=None): #@UnusedVariable #pylint: disable=unused-argument
         """stop recording actions"""
-        if not self.__recorder: raise RuntimeError('tried to stop recording while not recording!')
+        if not self.__recorder:
+            self.logger.warning('tried to stop recording while not recording!')
+            return # stop!
         # format and prep
         self.btn_record.config(text=' '.join(
             ['Record']+self.btn_record['text'].split(' ')[1:]))
@@ -249,6 +255,10 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
         """ run currently loaded script..."""
         if self.btn_run['state'] == tk.DISABLED: return None # stop!
         self.logger.info('start')
+        
+        if self.__input_list is None: return
+        for i in self.__input_list.to_json():
+            print(i)
 
     #===========================================================================
     # Edit > Text Editor...

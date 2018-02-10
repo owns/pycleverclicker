@@ -17,7 +17,7 @@ class MyInputRecorder(Thread,MyLoggingBase):
 
     __continue_running = True
     __queue = None
-    __stop_fn = None
+    __root = None
     __time_lock = None
     __key_lock = None
     __pressed_keys = None
@@ -33,12 +33,12 @@ class MyInputRecorder(Thread,MyLoggingBase):
                    keyboard.Key.alt,keyboard.Key.alt_gr,keyboard.Key.alt_l,keyboard.Key.alt_r,
                    keyboard.Key.cmd,keyboard.Key.cmd_l,keyboard.Key.cmd_r)
 
-    def __init__(self,actions_queue,stop_fn,*args,**keys):
+    def __init__(self,root, actions_queue,*args,**keys):
         MyLoggingBase.__init__(self,*args,**keys)
         Thread.__init__(self,*args,**keys)
 
+        self.__root = root
         self.__queue = actions_queue
-        self.__stop_fn = stop_fn
         self.__time_lock = Lock()
         self.__key_lock = Lock()
 
@@ -77,8 +77,8 @@ class MyInputRecorder(Thread,MyLoggingBase):
             k = key.char
             if not k.isalnum(): # or k != k.lower():
                 if self.__is_shift and key == keyboard.KeyCode(char='\x12'): #ctrl+r
-                    #TODO: send button evt?
-                    self.logger.warning('needs work!!!')
+                    self.logger.debug('sending <<stop-recording>> event ...')
+                    self.__root.event_generate('<<stop-recording>>', when="tail")
                     return None # stop listener
                 self.logger.warning('invalid key %r',key)
                 return None # stop
@@ -127,7 +127,7 @@ class MyInputRecorder(Thread,MyLoggingBase):
                 with self.__key_lock: #pylint: disable=not-context-manager
                     pressed = new_time - self.__pressed_keys.pop(name,new_time)
             # add to queue
-            self.__queue.put_nowait(dict(type='type',time=new_time-self.__last_time,
+            self.__queue.put_nowait(dict(type='keyboard',time=new_time-self.__last_time,
                                          pressed=pressed,name=name))
             # store time for next action
             self.__last_time = new_time
@@ -137,7 +137,7 @@ class MyInputRecorder(Thread,MyLoggingBase):
     #===========================================================================
     def stop(self):
         """ start stopping ..."""
-        self.logger.info('told to stop')
+        self.logger.info('told to stop ...')
         self.__continue_running = False
 
     #===========================================================================
