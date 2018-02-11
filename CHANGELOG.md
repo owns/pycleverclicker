@@ -2,6 +2,8 @@
 ## Added
 - this file - CHANGELOG.md
 - myinputdata.py class to (de) serialize each input line
+- Ctrl+Shift+R stops recording by raising event!
+- Run prints actions to console
 ## Changed
 - refactored following pylint
 - pymybase located in packages module

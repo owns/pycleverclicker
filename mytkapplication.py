@@ -8,6 +8,7 @@ Created on 2017-03-19
 
 import tkinter as tk
 from tkinter import messagebox
+from mysettingsdialog import MySettingsDialog
 import queue
 from packages.pymybase.myloggingbase import MyLoggingBase
 from myinputrecorder import MyInputRecorder
@@ -129,7 +130,6 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
         # Binds
         #=======================================================================
         #self.bind('<Destroy>', self.on_quit)
-        #TODO: test close action in ubuntu
         self.master.protocol("WM_DELETE_WINDOW", self.on_quit)
 
         #=======================================================================
@@ -195,6 +195,14 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
         if self.__recorder:
             self.logger.warning('tried to start recording while already recording!')
             return # stop!
+        
+        # prompt for delay time 
+        inputs = {'start delay':15,
+                  'random variance':3}
+        
+        d = MySettingsDialog(parent=self.master,inputs=inputs)
+        return # stop
+        
         # format and prep
         self.btn_record.config(text=' '.join(
             ['Stop']+self.btn_record['text'].split(' ')[1:]))
