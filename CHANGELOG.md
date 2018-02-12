@@ -9,6 +9,7 @@
 ## Changed
 - refactored following pylint
 - pymybase located in packages module
+- pymybase only included needed files (not entire repo!)
 ## Bug
 - no keyboard long hold???
 ## Fixed
