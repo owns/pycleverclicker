@@ -6,22 +6,33 @@ Created on 2017-03-19
 <desc here>
 """
 
-import tkinter as tk
-from tkinter import messagebox
-from mysettingsdialog import MySettingsDialog
-import queue
 from packages.pymybase.myloggingbase import MyLoggingBase
+import main
 from myinputrecorder import MyInputRecorder
 from myinputdata import MyInputData
-import json
+from mysettingsdialog import MySettingsDialog
+import tkinter as tk
+from tkinter import messagebox
+import datetime
+import queue
+from os import path
 
 class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instance-attributes
     """The Tk.Frame"""
     DEFAULT_TITLE = 'PyCleverClicker'
     DEFAULT_ABOUT_TXT = ('By: owns <owns13927@yahoo.com>\n'+
-                         'Created: 2017-03-19\n'+
-                         'Modified: 2018-02-06\n'+
+                         '\nVersion: '+main.__version__+
+                         '\nRepo: '+main.__repo__+
+                         '\nCreated: 2017-03-19'+
+                         '\nModified: '+datetime.datetime.fromtimestamp(path.getmtime(__file__)).strftime('%Y-%m-%d')+
                          '')
+    
+    DEFAULT_SETTINGS = {'repeat limit':0,
+                        'start delay':12,
+                        'start variance':0,
+                        'action variance':0}
+    settings = None
+    
     __status = None
     __next_action = None
     __log = None
@@ -34,46 +45,69 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
     __running = False
 
     def __init__(self, master=None,title=None):
+        # init base classes
         MyLoggingBase.__init__(self)
         tk.Frame.__init__(self, master)
+        
+        # set title
         self.master.title(title if title else self.DEFAULT_TITLE)
-
+        
+        # load settings
+        self.settings = self.DEFAULT_SETTINGS
+        self.settings.update(
+            self.read_file_key_values(self.get_resource_fd('settings.ini')))
+        
+        # set grid style
         tk.Grid.rowconfigure(self.master, 0, weight=1)
         tk.Grid.columnconfigure(self.master, 0, weight=1)
         self.grid(sticky=tk.N+tk.E+tk.S+tk.W) #self.pack()
         self.create_frame()
 
+        # format application (no resize, always on top, icon)
         self.master.resizable(0,0) # not resizable
-        self.master.call('wm', 'attributes', '.', '-topmost', True) # always on top
+        #self.master.call('wm', 'attributes', '.', '-topmost', True)
+        self.master.wm_attributes('-topmost', True) # always on top
         # set title bar icon
         try: self.master.iconbitmap(self.get_resource_fd('python-icon.ico'))
         except tk.TclError: pass # in ubuntu: _tkinter.TclError: bitmap /.../... not defined
-
-    #===========================================================================
-    # dummy functions
-    #===========================================================================
+        
+        
+#===========================================================================
+#--- dummy functions
+#===========================================================================
     def not_implemented(self, evt=None):
         """for buttons not yet bound"""
         self.logger.debug('evt:%s',evt)
         self.set_status('Feature not implemented')
         messagebox.showerror('Not Implemented', 'This feature has net yet been built!')
 
-    #===========================================================================
-    # Clean up!!!
-    #===========================================================================
+#===========================================================================
+#--- clean up!!!
+#===========================================================================
     def on_quit(self, evt=None): #@UnusedVariable #pylint: disable=unused-argument
         """run on quit  """
         self.logger.debug('cleaning ...')
+        
+        # stop recorder if running
         if self.__recorder:
             #messagebox.showerror('Not Implemented', 'This feature has net yet been built!')
             if self.__recorder.is_alive():
                 self.__recorder.stop()
                 self.__recorder.join()
+        
+        # save settings
+        saved = self.write_file_key_values(
+            self.get_resource_fd('settings.ini'),
+            overwrite_file=True, **self.settings)
+        if saved: self.logger.debug('settings saved')
+        else: self.logger.warning('settings failed to save')
+        
+        # quit!
         self.quit()
 
-    #===========================================================================
-    # createFrame - build menu bar
-    #===========================================================================
+#===========================================================================
+#--- create entire frame
+#===========================================================================
     def __create_menubar(self):
         """create and add menubar"""
         menu_bar = tk.Menu(self.master)
@@ -105,7 +139,7 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
                               underline=0,accelerator='Ctrl+T')
         self.bind_all('<Control-t>',self.not_implemented)
         edit_menu.add_separator()
-        edit_menu.add_command(label='Options',command=self.not_implemented,
+        edit_menu.add_command(label='Options',command=self.menu_edit_options,
                               underline=0,accelerator='')
         menu_bar.add_cascade(label='Edit',menu=edit_menu,underline=0)
 
@@ -179,10 +213,10 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
                 tk.Grid.columnconfigure(self, col, weight=1)
 
         self.set_status('Ready')
-
-    #===========================================================================
-    # Record
-    #===========================================================================
+    
+#===========================================================================
+#--- Record
+#===========================================================================
     def record(self,evt=None):
         """ start/stop recording..."""
         if self.btn_record['state'] == tk.DISABLED: return None # stop!
@@ -196,12 +230,12 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
             self.logger.warning('tried to start recording while already recording!')
             return # stop!
         
-        # prompt for delay time 
-        inputs = {'start delay':15,
-                  'random variance':3}
-        
-        d = MySettingsDialog(parent=self.master,inputs=inputs)
-        return # stop
+        # prompt for settings
+        dlg = MySettingsDialog(parent=self.master,inputs=self.settings)
+        if dlg.result is None:
+            return # dialog was dismissed
+        else:
+            self.settings.update(dlg.result)
         
         # format and prep
         self.btn_record.config(text=' '.join(
@@ -256,9 +290,9 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
             self.__recorder.join()
         self.__recorder = None
 
-    #===========================================================================
-    # Run
-    #===========================================================================
+#===========================================================================
+#--- Run
+#===========================================================================
     def run(self,evt=None): #@UnusedVariable #pylint: disable=unused-argument
         """ run currently loaded script..."""
         if self.btn_run['state'] == tk.DISABLED: return None # stop!
@@ -268,33 +302,47 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
         for i in self.__input_list.to_json():
             print(i)
 
-    #===========================================================================
-    # Edit > Text Editor...
-    #===========================================================================
+#===========================================================================
+#--- MenuBar actions
+#===========================================================================
+    def menu_edit_options(self,evt=None): #@UnusedVariable #pylint: disable=unused-argument
+        """open settings dialog and save changes"""
+        self.logger.debug('start options')
+        
+        dlg = MySettingsDialog(parent=self.master,inputs=self.settings)
+        if dlg.result is None:
+            self.logger.debug('start options')
+        else:
+            self.settings.update(dlg.result)
+            self.logger.info('settings updated')
+
+#===========================================================================
+#--- Edit > Text Editor...
+#===========================================================================
     def open_text_editor(self,evt=None):
         """open current script in the text editor"""
         self.logger.debug('evt:%s',evt)
         self.not_implemented(evt)
 
-    #===========================================================================
-    # Tools > ...
-    #===========================================================================
+#===========================================================================
+#--- Tools > ...
+#===========================================================================
     def tool_test_color(self,evt=None):
         """open mini tool to get color values"""
         self.logger.debug('evt:%s',evt)
         self.not_implemented(evt)
 
-    #===========================================================================
-    # Help > About
-    #===========================================================================
+#===========================================================================
+#--- Help > About
+#===========================================================================
     def show_about(self,evt=None):
         """ open the help dialog """
         self.logger.debug('evt:%s',evt)
         messagebox.showinfo('About '+self.master.title(),self.DEFAULT_ABOUT_TXT)
 
-    #===========================================================================
-    # update user
-    #===========================================================================
+#===========================================================================
+#--- update user
+#===========================================================================
     def add_log(self,msg,*args):
         """ insert text to the log dialog """
         self.__lb.config(state=tk.NORMAL)
