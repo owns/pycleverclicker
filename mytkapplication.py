@@ -12,6 +12,7 @@ from myinputrecorder import MyInputRecorder
 from myinputdata import MyInputData
 from mysettingsdialog import MySettingsDialog
 import tkinter as tk
+#import tkinter.ttk as ttk
 from tkinter import messagebox
 import datetime
 import queue
@@ -20,13 +21,6 @@ from os import path
 class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instance-attributes
     """The Tk.Frame"""
     DEFAULT_TITLE = 'PyCleverClicker'
-    DEFAULT_ABOUT_TXT = ('By: owns <owns13927@yahoo.com>\n'+
-                         '\nVersion: '+main.__version__+
-                         '\nRepo: '+main.__repo__+
-                         '\nCreated: 2017-03-19'+
-                         '\nModified: '+datetime.datetime.fromtimestamp(path.getmtime(__file__)).strftime('%Y-%m-%d')+
-                         '')
-    
     DEFAULT_SETTINGS = {'repeat limit':0,
                         'start delay':12,
                         'start variance':0,
@@ -61,6 +55,8 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
         tk.Grid.rowconfigure(self.master, 0, weight=1)
         tk.Grid.columnconfigure(self.master, 0, weight=1)
         self.grid(sticky=tk.N+tk.E+tk.S+tk.W) #self.pack()
+        
+        # create the frame
         self.create_frame()
 
         # format application (no resize, always on top, icon)
@@ -108,68 +104,15 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
 #===========================================================================
 #--- create entire frame
 #===========================================================================
-    def __create_menubar(self):
-        """create and add menubar"""
-        menu_bar = tk.Menu(self.master)
-
-        # MenuBar - File
-        file_menu = tk.Menu(menu_bar,tearoff=0)
-        file_menu.add_command(label='New',command=self.not_implemented,
-                              underline=0,accelerator='Ctrl+N')
-        self.bind_all('<Control-n>',self.not_implemented)
-        file_menu.add_command(label='Open...',command=self.not_implemented,
-                              underline=0,accelerator='Ctrl+O')
-        self.bind_all('<Control-o>',self.not_implemented)
-        file_menu.add_separator()
-        file_menu.add_command(label='Save',command=self.not_implemented,
-                              underline=0,accelerator='Ctrl+S')
-        self.bind_all('<Control-s>',self.not_implemented)
-        file_menu.add_command(label='Save As ...',command=self.not_implemented,
-                              accelerator='Ctrl+Shift+S')
-        self.bind_all('<Control-Shift-S>',self.not_implemented)
-        file_menu.add_separator()
-        file_menu.add_command(label='Exit',command=self.on_quit,
-                              underline=1,accelerator='Ctrl+Q')
-        self.bind_all('<Control-q>',self.on_quit)
-        menu_bar.add_cascade(label='File',menu=file_menu,underline=0)
-
-        # MenuBar - Edit
-        edit_menu = tk.Menu(menu_bar,tearoff=0)
-        edit_menu.add_command(label='Text Editor...',command=self.not_implemented,
-                              underline=0,accelerator='Ctrl+T')
-        self.bind_all('<Control-t>',self.not_implemented)
-        edit_menu.add_separator()
-        edit_menu.add_command(label='Options',command=self.menu_edit_options,
-                              underline=0,accelerator='')
-        menu_bar.add_cascade(label='Edit',menu=edit_menu,underline=0)
-
-        # MenuBar - Tools
-        tool_menu = tk.Menu(menu_bar,tearoff=0)
-        tool_menu.add_command(label='Test Color...',command=self.tool_test_color,
-                              underline=0,accelerator='Shift+T')
-        self.bind_all('<Shift-T>',self.tool_test_color)
-        menu_bar.add_cascade(label='Tools',menu=tool_menu,underline=0)
-
-        # MenuBar - Help
-        help_menu = tk.Menu(menu_bar,tearoff=0)
-        help_menu.add_command(label='About',command=self.show_about,underline=0)
-        menu_bar.add_cascade(label='Help',menu=help_menu,underline=0)
-
-        # MenuBar - attach to frame
-        self.master.config(menu=menu_bar)
-
     def create_frame(self):
         """build the frame"""
-        #=======================================================================
         # Binds
-        #=======================================================================
-        #self.bind('<Destroy>', self.on_quit)
         self.master.protocol("WM_DELETE_WINDOW", self.on_quit)
-
-        #=======================================================================
+        
         # MenuBar
-        #=======================================================================
-        self.__create_menubar()
+        menu_bar = MyTkMenuBar(self)
+        # MenuBar - attach to frame
+        self.master.config(menu=menu_bar)
 
         #=======================================================================
         # Frame
@@ -303,44 +246,6 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
             print(i)
 
 #===========================================================================
-#--- MenuBar actions
-#===========================================================================
-    def menu_edit_options(self,evt=None): #@UnusedVariable #pylint: disable=unused-argument
-        """open settings dialog and save changes"""
-        self.logger.debug('start options')
-        
-        dlg = MySettingsDialog(parent=self.master,inputs=self.settings)
-        if dlg.result is None:
-            self.logger.debug('start options')
-        else:
-            self.settings.update(dlg.result)
-            self.logger.info('settings updated')
-
-#===========================================================================
-#--- Edit > Text Editor...
-#===========================================================================
-    def open_text_editor(self,evt=None):
-        """open current script in the text editor"""
-        self.logger.debug('evt:%s',evt)
-        self.not_implemented(evt)
-
-#===========================================================================
-#--- Tools > ...
-#===========================================================================
-    def tool_test_color(self,evt=None):
-        """open mini tool to get color values"""
-        self.logger.debug('evt:%s',evt)
-        self.not_implemented(evt)
-
-#===========================================================================
-#--- Help > About
-#===========================================================================
-    def show_about(self,evt=None):
-        """ open the help dialog """
-        self.logger.debug('evt:%s',evt)
-        messagebox.showinfo('About '+self.master.title(),self.DEFAULT_ABOUT_TXT)
-
-#===========================================================================
 #--- update user
 #===========================================================================
     def add_log(self,msg,*args):
@@ -359,3 +264,87 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
     def set_status(self,msg,*args):
         """set the status"""
         self.__status.set(msg.format(*args))
+
+class MyTkMenuBar(tk.Menu,MyLoggingBase):
+    """menubar for application"""
+    
+    DEFAULT_ABOUT_TXT = ('By: owns <owns13927@yahoo.com>\n'+
+                         '\nVersion: '+main.__version__+
+                         '\nRepo: '+main.__repo__+
+                         '\nCreated: 2017-03-19'+
+                         '\nModified: '+datetime.datetime.fromtimestamp(path.getmtime(__file__)).strftime('%Y-%m-%d')+
+                         '')
+
+    def __init__(self, parent, name=None):
+        MyLoggingBase.__init__(self, name=name)
+        tk.Menu.__init__(self, parent)
+
+        # MenuBar - File
+        file_menu = tk.Menu(self,tearoff=0)
+        file_menu.add_command(label='New',command=parent.not_implemented,
+                              underline=0,accelerator='Ctrl+N')
+        self.bind_all('<Control-n>',parent.not_implemented)
+        file_menu.add_command(label='Open...',command=parent.not_implemented,
+                              underline=0,accelerator='Ctrl+O')
+        self.bind_all('<Control-o>',parent.not_implemented)
+        file_menu.add_separator()
+        file_menu.add_command(label='Save',command=parent.not_implemented,
+                              underline=0,accelerator='Ctrl+S')
+        self.bind_all('<Control-s>',parent.not_implemented)
+        file_menu.add_command(label='Save As ...',command=parent.not_implemented,
+                              accelerator='Ctrl+Shift+S')
+        self.bind_all('<Control-Shift-S>',parent.not_implemented)
+        file_menu.add_separator()
+        file_menu.add_command(label='Exit',command=parent.on_quit,
+                              underline=1,accelerator='Ctrl+Q')
+        self.bind_all('<Control-q>', parent.on_quit)
+        self.add_cascade(label='File',menu=file_menu,underline=0)
+
+        # MenuBar - Edit
+        edit_menu = tk.Menu(self,tearoff=0)
+        edit_menu.add_command(label='Text Editor...',command=parent.not_implemented,
+                              underline=0,accelerator='Ctrl+T')
+        self.bind_all('<Control-t>',parent.not_implemented)
+        edit_menu.add_separator()
+        edit_menu.add_command(label='Options',command=self.menu_edit_options,
+                              underline=0,accelerator='')
+        self.add_cascade(label='Edit',menu=edit_menu,underline=0)
+
+        # MenuBar - Tools
+        tool_menu = tk.Menu(self,tearoff=0)
+        tool_menu.add_command(label='Test Color...',command=self.tool_test_color,
+                              underline=0,accelerator='Shift+T')
+        self.bind_all('<Shift-T>',self.tool_test_color)
+        self.add_cascade(label='Tools',menu=tool_menu,underline=0)
+ 
+        # MenuBar - Help
+        help_menu = tk.Menu(self,tearoff=0)
+        help_menu.add_command(label='About',command=self.show_about,underline=0)
+        self.add_cascade(label='Help',menu=help_menu,underline=0)
+
+#===============================================================================
+#--- Menu Bar Actions
+#===============================================================================
+    def menu_edit_options(self,evt=None):
+        """open settings dialog and save changes"""
+        self.logger.debug('open options dialog %s','' if evt is None else evt)
+        
+        dlg = MySettingsDialog(parent=self.master,inputs=self.master.settings)
+        if dlg.result is None:
+            self.logger.debug('options dismissed')
+        else:
+            self.master.settings.update(dlg.result)
+            self.logger.info('settings updated')
+        
+    def show_about(self,evt=None):
+        """ open the help dialog """
+        self.logger.debug('evt:%s',evt)
+        messagebox.showinfo('About '+self.master.master.title(),self.DEFAULT_ABOUT_TXT)
+    
+    def tool_test_color(self,evt=None):
+        """open mini tool to get color values"""
+        self.logger.debug('evt:%s',evt)
+        self.master.not_implemented(evt)        
+    
+            
+            
