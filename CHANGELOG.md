@@ -6,6 +6,7 @@
 - Run prints actions to console
 - run options! Edit -> Options and prompted on open
 - commit messaged add #xx to link to isssue and prefix w/ 'close' to close!
+- try 2
 ## Changed
 - refactored following pylint
 - pymybase located in packages module
