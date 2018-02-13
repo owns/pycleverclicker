@@ -25,11 +25,9 @@ class MyTkApplication(tk.Tk,MyLoggingBase):
                         'start variance':0,
                         'action variance':0}
     settings = None
-    status_bar = None
     main_frame = None
+    status_bar = None
     
-    __log = None
-
     def __init__(self):
         # init base classes
         MyLoggingBase.__init__(self,name='app')
@@ -38,8 +36,7 @@ class MyTkApplication(tk.Tk,MyLoggingBase):
         # load settings
         self.settings = self.DEFAULT_SETTINGS
         for k,v in self.read_file_key_values(self.get_resource_fd('settings.ini')).items():
-            try:
-                t = float(v) # is float?
+            try: t = float(v) # is float?
             except ValueError: t = v # must be string
             else:
                 if t == int(t): t = int(t) # is int?
@@ -84,7 +81,6 @@ class MyTkApplication(tk.Tk,MyLoggingBase):
 #                           self.winfo_reqwidth(),
 #                           self.winfo_reqheight()
 #                           )
-# #          
         self.set_status('Ready') # update status
         #self.deiconify() # visible
         
@@ -112,25 +108,8 @@ class MyTkApplication(tk.Tk,MyLoggingBase):
         if saved: self.logger.debug('settings saved')
         else: self.logger.warning('settings failed to save')
         
-        # quit!
-        self.quit()
-
-#===========================================================================
-#--- update user
-#===========================================================================
-    def add_log(self,msg,*args):
-        """ insert text to the log dialog """
-        self.__lb.config(state=tk.NORMAL)
-        self.__lb.insert(0,msg.format(*args))
-        size = self.__lb.size()
-        if size > self.LB_MAX_SIZE: self.__lb.delete(self.LB_MAX_SIZE, size-1)
-        self.__lb.config(state=tk.DISABLED)
-
-    def set_next_action(self,msg,*args,to_log=True):
-        """ set the next action text """
-        if to_log: self.add_log(self.__next_action.get()) # add last action to log
-        self.__next_action.set(msg.format(*args)) # prep
-
+        self.quit() # quit!
+    
     def set_status(self,msg,*args):
         """set the status"""
         self.status_bar.set_status(msg.format(*args))
@@ -346,7 +325,8 @@ class MyTkMainFrame(ttk.Frame,MyLoggingBase):
 
         # --- start recorder
         # clear console
-        map(self.list_actions.delete,self.list_actions.get_children())
+        for i in self.list_actions.get_children():
+            self.list_actions.delete(i)
         # re-set list of actions
         self.actions = MyInputData()
         # create recorder queue
@@ -395,7 +375,13 @@ class MyTkMainFrame(ttk.Frame,MyLoggingBase):
             self.recorder.stop()
             self.recorder.join()
         self.recorder = None
-
+    
+    def add_log(self,msg,*args):
+        """ insert text to the log dialog """
+        self.list_actions.insert('', 0, open=True, #text=''
+                                 values=('{0:03d}'.format(len(self.actions)+1),
+                                         msg.format(*args),))
+    
 #===========================================================================
 #--- Run
 #===========================================================================
@@ -407,24 +393,28 @@ class MyTkMainFrame(ttk.Frame,MyLoggingBase):
         if self.actions is None: return
         for i in self.actions.to_json():
             print(i)
-    
-    def add_log(self,msg,*args):
-        """ insert text to the log dialog """
-        self.list_actions.insert('', 0, open=True, #text=''
-                                 values=('{0:03d}'.format(len(self.actions)+1),
-                                         msg.format(*args),))
-        
-        #ids = self.list_actions.get_children()
-        # keep size small
-        #if len(ids) > self.LB_MAX_SIZE:
-        #    self.list_actions.delete(ids[-1])
-    
-    
-    
-    
-    
-    
-    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     
     
     

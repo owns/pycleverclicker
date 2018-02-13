@@ -10,7 +10,8 @@
 - refactored following pylint
 - pymybase located in packages module
 - pymybase only included needed files (not entire repo!)
+- refactored app components and 
 ## Bug
-- no keyboard long hold???
 ## Fixed
+- no keyboard long hold due to keyboard - increase C/S override caused issues
 ## Removed
