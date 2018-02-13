@@ -12,22 +12,21 @@ from myinputrecorder import MyInputRecorder
 from myinputdata import MyInputData
 from mysettingsdialog import MySettingsDialog
 import tkinter as tk
-#import tkinter.ttk as ttk
+import tkinter.ttk as ttk
 from tkinter import messagebox
 import datetime
 import queue
 from os import path
 
-class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instance-attributes
+class MyTkApplication(tk.Tk,MyLoggingBase): #pylint: disable=too-many-instance-attributes
     """The Tk.Frame"""
-    DEFAULT_TITLE = 'PyCleverClicker'
     DEFAULT_SETTINGS = {'repeat limit':0,
                         'start delay':12,
                         'start variance':0,
                         'action variance':0}
     settings = None
+    status_bar = None
     
-    __status = None
     __next_action = None
     __log = None
     __lb = None
@@ -38,48 +37,64 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
     __input_list = None
     __running = False
 
-    def __init__(self, master=None,title=None):
+    def __init__(self):
         # init base classes
-        MyLoggingBase.__init__(self)
-        tk.Frame.__init__(self, master)
-        
-        # set title
-        self.master.title(title if title else self.DEFAULT_TITLE)
+        MyLoggingBase.__init__(self,name='app')
+        tk.Tk.__init__(self)
         
         # load settings
         self.settings = self.DEFAULT_SETTINGS
         self.settings.update(
             self.read_file_key_values(self.get_resource_fd('settings.ini')))
         
-        # set grid style
-        tk.Grid.rowconfigure(self.master, 0, weight=1)
-        tk.Grid.columnconfigure(self.master, 0, weight=1)
-        self.grid(sticky=tk.N+tk.E+tk.S+tk.W) #self.pack()
+        # setup application window
+        self.title(main.__title__) # set title
+        self.iconname(main.__title__)
+        self.attributes('-topmost', True) # always on top
+        self.resizable(width=False,height=False) # not resizable
+        #self.geometry('640x480')
+        self.protocol("WM_DELETE_WINDOW", self.on_quit) # bind ALT+F4
         
-        # create the frame
+        # add MenuBar
+        menu_bar = MyTkMenuBar(self)
+        self.config(menu=menu_bar) #attach to frame
+        
+        # add StatusBar
+        self.status_bar = MyTkStatusBar(self)
+        self.status_bar.pack(side='bottom', fill=tk.X)
+        
+        # add frame
         self.create_frame()
-
-        # format application (no resize, always on top, icon)
-        self.master.resizable(0,0) # not resizable
-        #self.master.call('wm', 'attributes', '.', '-topmost', True)
-        self.master.wm_attributes('-topmost', True) # always on top
-        # set title bar icon
-        try: self.master.iconbitmap(self.get_resource_fd('python-icon.ico'))
+        
+        # Remain invisible while we resize
+        #self.withdraw() # invisible #self.transient(self.master)
+        #self.transient(self.master)
+        #self.update_idletasks() # update geometry
+        
+        # set title bar icon (causes geo and to show)
+        try: self.iconbitmap(self.get_resource_fd('python-icon.ico'))
         except tk.TclError: pass # in ubuntu: _tkinter.TclError: bitmap /.../... not defined
+#         self.logger.debug('%r %r %r (%r,%r) -- (%r,%r) %r %r',
+#                           self.winfo_ismapped(),
+#                           self.winfo_rootx(),
+#                           self.winfo_rooty(),
+#                           self.winfo_screenwidth(),
+#                           self.winfo_screenheight(),
+#                           self.winfo_width(),
+#                           self.winfo_height(),
+#                           self.winfo_reqwidth(),
+#                           self.winfo_reqheight()
+#                           )
+# #          
+        self.set_status('Ready') # update status
+        #self.deiconify() # visible
         
-        
-#===========================================================================
-#--- dummy functions
-#===========================================================================
     def not_implemented(self, evt=None):
         """for buttons not yet bound"""
         self.logger.debug('evt:%s',evt)
         self.set_status('Feature not implemented')
         messagebox.showerror('Not Implemented', 'This feature has net yet been built!')
-
-#===========================================================================
-#--- clean up!!!
-#===========================================================================
+        
     def on_quit(self, evt=None): #@UnusedVariable #pylint: disable=unused-argument
         """run on quit  """
         self.logger.debug('cleaning ...')
@@ -106,56 +121,39 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
 #===========================================================================
     def create_frame(self):
         """build the frame"""
-        # Binds
-        self.master.protocol("WM_DELETE_WINDOW", self.on_quit)
-        
-        # MenuBar
-        menu_bar = MyTkMenuBar(self)
-        # MenuBar - attach to frame
-        self.master.config(menu=menu_bar)
+        pass
 
-        #=======================================================================
-        # Frame
-        #=======================================================================
-        # buttons
-        self.btn_record = tk.Button(self,text='Record (Ctrl+Shift+R)',command=self.record)
-        self.btn_record.grid(row=0,column=0,sticky=tk.N+tk.E+tk.S+tk.W)
-        self.bind_all('<Control-Shift-R>',self.record)
-        self.bind_all('<<stop-recording>>',self.stop_recording)
-        self.btn_run = tk.Button(self,text='Run (Ctrl+R)',command=self.run)
-        self.btn_run.grid(row=0,column=1,sticky=tk.N+tk.E+tk.S+tk.W)
-        self.bind_all('<Control-r>',self.run)
-
-        # next action
-        tlf = tk.LabelFrame(self,text='Next Action:')
-        tlf.columnconfigure(0, weight=1) # so resize will fit
-        tlf.grid(row=1,columnspan=2,sticky=tk.N+tk.E+tk.S+tk.W)
-        self.__next_action = tk.StringVar(value='',name='next action')
-        tk.Label(tlf,textvariable=self.__next_action,
-                 anchor=tk.W,justify=tk.LEFT,width=33
-                 ).grid(row=1,column=0,columnspan=2,
-                        sticky=tk.N+tk.E+tk.S+tk.W)
-
-        # console
-        tlf = tk.LabelFrame(self,text='Console:')
-        tlf.columnconfigure(0, weight=1) # so resize will fit
-        tlf.grid(row=2,columnspan=2,sticky=tk.N+tk.E+tk.S+tk.W)
-        self.__lb = tk.Listbox(tlf,height=self.LB_MAX_SIZE)
-        self.__lb.grid(row=2,column=0,columnspan=2,sticky=tk.N+tk.E+tk.S+tk.W)
-        self.__lb.config(state=tk.DISABLED)
-        # status bar
-        self.__status = tk.StringVar(value='waiting ...',name='status bar')
-        tk.Label(self, bd=1, relief=tk.SUNKEN, anchor=tk.W,
-                 textvariable=self.__status).grid(row=3,column=0,columnspan=2,
-                                                  sticky=tk.N+tk.E+tk.S+tk.W)
-
-        # resizable
-        for row in range(3):
-            tk.Grid.rowconfigure(self, row, weight=1)
-            for col in range(2):
-                tk.Grid.columnconfigure(self, col, weight=1)
-
-        self.set_status('Ready')
+#         #=======================================================================
+#         # Frame
+#         #=======================================================================
+#         # buttons
+#         self.btn_record = tk.Button(self,text='Record (Ctrl+Shift+R)',command=self.record)
+#         self.btn_record.grid(row=0,column=0,sticky=tk.N+tk.E+tk.S+tk.W)
+#         self.bind_all('<Control-Shift-R>',self.record)
+#         self.bind_all('<<stop-recording>>',self.stop_recording)
+#         self.btn_run = tk.Button(self,text='Run (Ctrl+R)',command=self.run)
+#         self.btn_run.grid(row=0,column=1,sticky=tk.N+tk.E+tk.S+tk.W)
+#         self.bind_all('<Control-r>',self.run)
+# 
+#         # next action
+#         tlf = tk.LabelFrame(self,text='Next Action:')
+#         tlf.columnconfigure(0, weight=1) # so resize will fit
+#         tlf.grid(row=1,columnspan=2,sticky=tk.N+tk.E+tk.S+tk.W)
+#         self.__next_action = tk.StringVar(value='',name='next action')
+#         tk.Label(tlf,textvariable=self.__next_action,
+#                  anchor=tk.W,justify=tk.LEFT,width=33
+#                  ).grid(row=1,column=0,columnspan=2,
+#                         sticky=tk.N+tk.E+tk.S+tk.W)
+# 
+#         # console
+#         tlf = tk.LabelFrame(self,text='Console:')
+#         tlf.columnconfigure(0, weight=1) # so resize will fit
+#         tlf.grid(row=2,columnspan=2,sticky=tk.N+tk.E+tk.S+tk.W)
+#         self.__lb = tk.Listbox(tlf,height=self.LB_MAX_SIZE)
+#         self.__lb.grid(row=2,column=0,columnspan=2,sticky=tk.N+tk.E+tk.S+tk.W)
+#         self.__lb.config(state=tk.DISABLED)
+#         
+#         self.set_status('Ready')
     
 #===========================================================================
 #--- Record
@@ -174,7 +172,7 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
             return # stop!
         
         # prompt for settings
-        dlg = MySettingsDialog(parent=self.master,inputs=self.settings)
+        dlg = MySettingsDialog(parent=self,inputs=self.settings)
         if dlg.result is None:
             return # dialog was dismissed
         else:
@@ -190,7 +188,7 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
         # start recorder
         self.__input_list = MyInputData()
         self.__q = queue.Queue()
-        self.__recorder = MyInputRecorder(root=self.master,actions_queue=self.__q)
+        self.__recorder = MyInputRecorder(root=self,actions_queue=self.__q)
         self.__recorder.start()
         self.after(100,self.handle_record_action)
 
@@ -263,7 +261,7 @@ class MyTkApplication(tk.Frame,MyLoggingBase): #pylint: disable=too-many-instanc
 
     def set_status(self,msg,*args):
         """set the status"""
-        self.__status.set(msg.format(*args))
+        self.status_bar.set_status(msg.format(*args))
 
 class MyTkMenuBar(tk.Menu,MyLoggingBase):
     """menubar for application"""
@@ -275,8 +273,8 @@ class MyTkMenuBar(tk.Menu,MyLoggingBase):
                          '\nModified: '+datetime.datetime.fromtimestamp(path.getmtime(__file__)).strftime('%Y-%m-%d')+
                          '')
 
-    def __init__(self, parent, name=None):
-        MyLoggingBase.__init__(self, name=name)
+    def __init__(self, parent):
+        MyLoggingBase.__init__(self,name='menubar')
         tk.Menu.__init__(self, parent)
 
         # MenuBar - File
@@ -339,12 +337,65 @@ class MyTkMenuBar(tk.Menu,MyLoggingBase):
     def show_about(self,evt=None):
         """ open the help dialog """
         self.logger.debug('evt:%s',evt)
-        messagebox.showinfo('About '+self.master.master.title(),self.DEFAULT_ABOUT_TXT)
+        messagebox.showinfo('About '+self.master.title(),self.DEFAULT_ABOUT_TXT)
     
     def tool_test_color(self,evt=None):
         """open mini tool to get color values"""
         self.logger.debug('evt:%s',evt)
         self.master.not_implemented(evt)        
     
-            
+class MyTkStatusBar(ttk.Frame,MyLoggingBase):
+    """status bar"""
+    vars = None
+
+    def __init__(self, parent):
+        MyLoggingBase.__init__(self, name='statusbar')
+        ttk.Frame.__init__(self, parent)
+        
+        self.vars = [] # if we want multiple labels
+        self.add_section() # add status section
+    
+    def add_section(self,weight=1):
+        index = len(self.vars)
+        # create text var
+        text_var = tk.StringVar(value='loading ...')
+        
+        # create label and bind to text var
+        ttk.Label(self,
+            textvariable=text_var,
+            #relief=tk.SUNKEN, #SUNKEN #GROOVE
+            background='#ffffff',
+            width=1, # stop resizing!
+            anchor=tk.W
+        ).grid(row=0,column=index,sticky=tk.W+tk.E)
+        
+        # add var so we can set it's value later
+        self.vars.append(text_var)
+        
+        # set grid weight
+        self.grid_columnconfigure(index,weight=weight)
+    
+    # set values
+    def set_text(self, status_index, new_text): self.vars[status_index].set(new_text)
+    def set_status(self, new_text): self.vars[0].set(new_text)
+        
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
             
