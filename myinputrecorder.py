@@ -79,7 +79,7 @@ class MyInputRecorder(Thread,MyLoggingBase):
                 if self.__is_shift and key == keyboard.KeyCode(char='\x12'): #ctrl+r
                     self.logger.debug('sending <<stop-recording>> event ...')
                     self.__root.event_generate('<<stop-recording>>', when="tail")
-                    return None # stop listener
+                    return False # stop listener
                 self.logger.warning('invalid key %r',key)
                 return None # stop
 
