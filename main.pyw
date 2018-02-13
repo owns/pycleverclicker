@@ -56,6 +56,7 @@ while True:
 
 # simply threading...
 #http://stackoverflow.com/questions/16745507/tkinter-how-to-use-threads-to-preventing-main-event-loop-from-freezing pylint: disable=line-too-long
+__title__ = 'PyCleverClicker'
 __version__ = '0.1.0'
 __repo__ = 'https://github.com/owns/pycleverclicker/'
 
@@ -64,12 +65,13 @@ def main():
     # init logging and get main logger
     from packages.pymybase.myloggingbase import MyLoggingBase
     MyLoggingBase.init_logging(file_log_lvl='DEBUG',file_log_name='pycleverclicker.log')
-    logger = MyLoggingBase().logger
+    logger = MyLoggingBase(name='main').logger
 
     # start app
     logger.info('start')
     from mytkapplication import MyTkApplication
     app = MyTkApplication()
+    app.wait_visibility()
     app.mainloop()
     logger.info('done')
 
