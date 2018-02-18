@@ -14,7 +14,8 @@ from packages.pymybase.myloggingbase import MyLoggingBase
 
 class MyInputRecorder(Thread,MyLoggingBase):
     """handle recording mouse and keyboard input"""
-
+    
+    PRECISION = 4
     __continue_running = True
     __queue = None
     __root = None
@@ -55,7 +56,8 @@ class MyInputRecorder(Thread,MyLoggingBase):
                 new_time = time.time()
                 if not self.__last_time: self.__last_time = new_time
                 self.__queue.put_nowait(dict(type='mouse',name=button.name,
-                                             pos=(x_pos,y_pos),time=new_time-self.__last_time))
+                                             pos=(x_pos,y_pos),
+                                             time=round(new_time-self.__last_time,self.PRECISION)))
                 #self.__queue.put_nowait('{0!s} click at {1!s}'.format(button.name,(x,y)))
                 self.__last_time = new_time
 
@@ -127,8 +129,9 @@ class MyInputRecorder(Thread,MyLoggingBase):
                 with self.__key_lock: #pylint: disable=not-context-manager
                     pressed = new_time - self.__pressed_keys.pop(name,new_time)
             # add to queue
-            self.__queue.put_nowait(dict(type='keyboard',time=new_time-self.__last_time,
-                                         pressed=pressed,name=name))
+            self.__queue.put_nowait(dict(type='keyboard',name=name,
+                                         time=round(new_time-self.__last_time,self.PRECISION),
+                                         pressed=round(pressed,self.PRECISION)))
             # store time for next action
             self.__last_time = new_time
 

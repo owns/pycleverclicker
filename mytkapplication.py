@@ -14,9 +14,17 @@ from mysettingsdialog import MySettingsDialog
 import tkinter as tk
 import tkinter.ttk as ttk
 from tkinter import messagebox
+from tkinter import filedialog
 import datetime
 import queue
-from os import path
+import os
+from enum import Enum
+import json
+
+class State(Enum):
+    MENU = 'in menu'
+    RECORDING = 'recording'
+    RUNNING = 'running'
 
 class MyTkApplication(tk.Tk,MyLoggingBase):
     """The Tk.Frame"""
@@ -27,6 +35,10 @@ class MyTkApplication(tk.Tk,MyLoggingBase):
     settings = None
     main_frame = None
     status_bar = None
+    
+    actions = None
+    
+    _state = None
     
     def __init__(self):
         # init base classes
@@ -83,7 +95,28 @@ class MyTkApplication(tk.Tk,MyLoggingBase):
 #                           )
         self.set_status('Ready') # update status
         #self.deiconify() # visible
-        
+    
+    def start_state(self, state):
+        if self._state == None:
+            self._state = state
+            return True
+        else: return False
+    
+    def can_end_state(self, state):
+        return self._state == state
+    
+    def end_state(self, state):
+        if self._state == state:
+            self._state = None
+            return True
+        else:
+            self.logger.warning('unable to end state %s - current state %s',
+                                state,self._state)
+            return False
+    
+    def get_state(self):
+        return self._state
+    
     def not_implemented(self, evt=None):
         """for buttons not yet bound"""
         self.logger.debug('evt:%s',evt)
@@ -121,41 +154,42 @@ class MyTkMenuBar(tk.Menu,MyLoggingBase):
                          '\nVersion: '+main.__version__+
                          '\nRepo: '+main.__repo__+
                          '\nCreated: 2017-03-19'+
-                         '\nModified: '+datetime.datetime.fromtimestamp(path.getmtime(__file__)).strftime('%Y-%m-%d')+
+                         '\nModified: '+datetime.datetime.fromtimestamp(os.path.getmtime(__file__)).strftime('%Y-%m-%d')+
                          '')
-
+    _fullname = None
+    
     def __init__(self, parent):
         MyLoggingBase.__init__(self,name='menubar')
         tk.Menu.__init__(self, parent)
 
         # MenuBar - File
         file_menu = tk.Menu(self,tearoff=0)
-        file_menu.add_command(label='New',command=parent.not_implemented,
+        file_menu.add_command(label='New',command=self.check_in_menu(parent.not_implemented),
                               underline=0,accelerator='Ctrl+N')
-        self.bind_all('<Control-n>',parent.not_implemented)
-        file_menu.add_command(label='Open...',command=parent.not_implemented,
+        self.bind_all('<Control-n>',self.check_in_menu(parent.not_implemented))
+        file_menu.add_command(label='Open...',command=self.check_in_menu(parent.not_implemented),
                               underline=0,accelerator='Ctrl+O')
-        self.bind_all('<Control-o>',parent.not_implemented)
+        self.bind_all('<Control-o>',self.check_in_menu(parent.not_implemented))
         file_menu.add_separator()
-        file_menu.add_command(label='Save',command=parent.not_implemented,
+        file_menu.add_command(label='Save',command=self.check_in_menu(self.save),
                               underline=0,accelerator='Ctrl+S')
-        self.bind_all('<Control-s>',parent.not_implemented)
-        file_menu.add_command(label='Save As ...',command=parent.not_implemented,
+        self.bind_all('<Control-s>',self.check_in_menu(self.save))
+        file_menu.add_command(label='Save As ...',command=self.check_in_menu(self.saveAs),
                               accelerator='Ctrl+Shift+S')
-        self.bind_all('<Control-Shift-S>',parent.not_implemented)
+        self.bind_all('<Control-Shift-S>',self.check_in_menu(self.saveAs))
         file_menu.add_separator()
-        file_menu.add_command(label='Exit',command=parent.on_quit,
+        file_menu.add_command(label='Exit',command=self.check_in_menu(parent.on_quit),
                               underline=1,accelerator='Ctrl+Q')
-        self.bind_all('<Control-q>', parent.on_quit)
+        self.bind_all('<Control-q>',self.check_in_menu(parent.on_quit))
         self.add_cascade(label='File',menu=file_menu,underline=0)
 
         # MenuBar - Edit
         edit_menu = tk.Menu(self,tearoff=0)
-        edit_menu.add_command(label='Text Editor...',command=parent.not_implemented,
+        edit_menu.add_command(label='Text Editor...',command=self.check_in_menu(parent.not_implemented),
                               underline=0,accelerator='Ctrl+T')
-        self.bind_all('<Control-t>',parent.not_implemented)
+        self.bind_all('<Control-t>',self.check_in_menu(parent.not_implemented))
         edit_menu.add_separator()
-        edit_menu.add_command(label='Options',command=self.menu_edit_options,
+        edit_menu.add_command(label='Options',command=self.check_in_menu(self.edit_options),
                               underline=0,accelerator='')
         self.add_cascade(label='Edit',menu=edit_menu,underline=0)
 
@@ -171,12 +205,28 @@ class MyTkMenuBar(tk.Menu,MyLoggingBase):
         help_menu.add_command(label='About',command=self.show_about,underline=0)
         self.add_cascade(label='Help',menu=help_menu,underline=0)
 
+    def start_state(self,*args,**keys): return self.master.start_state(*args,**keys)
+    def can_end_state(self,*args,**keys): return self.master.can_end_state(*args,**keys)
+    def end_state(self,*args,**keys): return self.master.end_state(*args,**keys)
+    def get_state(self,*args,**keys): return self.master.get_state(*args,**keys)
 #===============================================================================
 #--- Menu Bar Actions
 #===============================================================================
-    def menu_edit_options(self,evt=None):
+    def check_in_menu(self, f):
+        def check_in_menu(*args,**keys):
+            if self.start_state(State.MENU):
+                a = f(*args,**keys)
+                self.end_state(State.MENU)
+                return a
+            else:
+                self.logger.debug('unable to start %s - in %s',f.__name__, self.get_state())
+                return None
+        
+        return check_in_menu
+    
+    def edit_options(self,evt=None):
         """open settings dialog and save changes"""
-        self.logger.debug('open options dialog %s','' if evt is None else evt)
+        self.logger.debug('open options dialog by %s','shortcut' if evt else 'click')
         
         dlg = MySettingsDialog(parent=self.master,inputs=self.master.settings)
         if dlg.result is None:
@@ -187,14 +237,58 @@ class MyTkMenuBar(tk.Menu,MyLoggingBase):
         
     def show_about(self,evt=None):
         """ open the help dialog """
-        self.logger.debug('evt:%s',evt)
+        self.logger.debug('start by %s','shortcut' if evt else 'click')
         messagebox.showinfo('About '+self.master.title(),self.DEFAULT_ABOUT_TXT)
     
     def tool_test_color(self,evt=None):
         """open mini tool to get color values"""
-        self.logger.debug('evt:%s',evt)
+        self.logger.debug('start by %s','shortcut' if evt else 'click')
         self.master.not_implemented(evt)        
     
+    def save(self,evt=None):
+        self.logger.debug('start by %s','shortcut' if evt else 'click')
+        
+        # saveAs if no file
+        if self._fullname is None: return self.saveAs(evt=evt)
+        
+        # open save file for writing
+        with open(self._fullname,mode='w') as w:
+            # save options
+            w.write('# settings\n')
+            w.write(json.dumps(self.master.settings, sort_keys=True)+'\n')
+            
+            # save the actions
+            w.write('\n# actions\n')
+            for a in self.master.actions:
+                w.write(json.dumps(a, sort_keys=True)+'\n')
+        
+        # done!
+        self.logger.info('saved to %s',self._fullname)        
+        
+    def saveAs(self,evt=None):
+        self.logger.debug('start by %s','shortcut' if evt else 'click')
+        
+        # create default folder if needed
+        init_fd = self.get_resource_fd('scripts')
+        if not os.path.exists(init_fd): os.makedirs(init_fd)
+        
+        # prompt for save file
+        fullname = filedialog.asksaveasfilename(
+            #title='',
+            parent=self.master,
+            initialdir=init_fd,
+            initialfile='MyScript.txt',
+            filetypes = [('text files', '.txt'),('all files', '.*')],
+            defaultextension='.txt')
+        # if a filename was selected
+        if fullname:
+            self.logger.debug('selected "%s"',fullname)
+            # set fullname
+            self._fullname = fullname
+            # do the saving
+            self.save(evt=evt)
+        else: self.logger.debug('save dismissed')
+
 class MyTkStatusBar(ttk.Frame,MyLoggingBase):
     """status bar"""
     vars = None
@@ -229,7 +323,7 @@ class MyTkStatusBar(ttk.Frame,MyLoggingBase):
     # set values
     def set_text(self, status_index, new_text): self.vars[status_index].set(new_text)
     def set_status(self, new_text): self.vars[0].set(new_text)
-        
+
 class MyTkMainFrame(ttk.Frame,MyLoggingBase):
     """main frame - middle bits"""
     
@@ -238,7 +332,6 @@ class MyTkMainFrame(ttk.Frame,MyLoggingBase):
     LB_MAX_SIZE = 6
     list_actions = None
     
-    actions = None
     recorder = None
     recorder_queue = None
     
@@ -293,25 +386,31 @@ class MyTkMainFrame(ttk.Frame,MyLoggingBase):
         #lf.columnconfigure(0, weight=1) # so resize will fit
         lf.grid(row=2,columnspan=2,sticky=tk.N+tk.E+tk.S+tk.W)
 
+    def start_state(self,*args,**keys): return self.master.start_state(*args,**keys)
+    def can_end_state(self,*args,**keys): return self.master.can_end_state(*args,**keys)
+    def end_state(self,*args,**keys): return self.master.end_state(*args,**keys)
+    def get_state(self,*args,**keys): return self.master.get_state(*args,**keys)
 #===========================================================================
 #--- Record
 #===========================================================================
     def record(self,evt=None):
         """ start/stop recording..."""
-        if self.btn_record['state'] == tk.DISABLED: return None # stop!
-        self.logger.info('clicked - %s ...','stopping' if bool(self.recorder) else 'recording')
-        if self.recorder: self.stop_recording(evt)
-        else: self.start_recording(evt)
+        if not self.get_state(): self.start_recording(evt)
+        elif self.can_end_state(State.RECORDING): self.stop_recording(evt)
+        else: self.logger.warning('cannot record - state is %s',self.get_state())
 
     def start_recording(self,evt=None): #@UnusedVariable #pylint: disable=unused-argument
         """start recording actions"""
-        if self.recorder:
-            self.logger.warning('tried to start recording while already recording!')
+        if not self.start_state(State.RECORDING):
+            self.logger.warning('tried to start recording while %s!',self.get_state())
             return # stop!
+        
+        self.logger.info('start recording by %s ...','shortcut' if evt else 'click')
         
         # prompt for settings
         dlg = MySettingsDialog(parent=self,inputs=self.master.settings)
         if dlg.result is None:
+            self.end_state(State.RECORDING)
             return # dialog was dismissed
         else:
             self.master.settings.update(dlg.result)
@@ -328,7 +427,7 @@ class MyTkMainFrame(ttk.Frame,MyLoggingBase):
         for i in self.list_actions.get_children():
             self.list_actions.delete(i)
         # re-set list of actions
-        self.actions = MyInputData()
+        self.master.actions = MyInputData()
         # create recorder queue
         self.recorder_queue = queue.Queue()
         # create and start recorder
@@ -352,7 +451,7 @@ class MyTkMainFrame(ttk.Frame,MyLoggingBase):
                     self.add_log('{0:.3f} {1} released after {2:.1f}',
                                  i['time'],i['name'],i['pressed']) # do work
                 # add to list
-                self.actions.append(i)
+                self.master.actions.append(i)
                 self.recorder_queue.task_done()
 
         # continue?
@@ -361,9 +460,12 @@ class MyTkMainFrame(ttk.Frame,MyLoggingBase):
 
     def stop_recording(self,evt=None): #@UnusedVariable #pylint: disable=unused-argument
         """stop recording actions"""
-        if not self.recorder:
+        if not self.can_end_state(State.RECORDING):
             self.logger.warning('tried to stop recording while not recording!')
             return # stop!
+        
+        self.logger.info('stop recording by %s ...','shortcut' if evt else 'click')
+        
         # format and prep
         self.btn_record.config(text=' '.join(
             ['Record']+self.btn_record['text'].split(' ')[1:]))
@@ -371,34 +473,39 @@ class MyTkMainFrame(ttk.Frame,MyLoggingBase):
         self.master.set_status('Recorder Stopped') # won't show till after b/c join
 
         # stop recorder - terminate and stop
-        if self.recorder.is_alive():
+        if self.recorder and self.recorder.is_alive():
             self.recorder.stop()
             self.recorder.join()
         self.recorder = None
+        
+        self.end_state(State.RECORDING)
     
     def add_log(self,msg,*args):
         """ insert text to the log dialog """
         self.list_actions.insert('', 0, open=True, #text=''
-                                 values=('{0:03d}'.format(len(self.actions)+1),
+                                 values=('{0:03d}'.format(len(self.master.actions)+1),
                                          msg.format(*args),))
     
 #===========================================================================
 #--- Run
 #===========================================================================
-    def run(self,evt=None): #@UnusedVariable #pylint: disable=unused-argument
+    def run(self,evt=None):
         """ run currently loaded script..."""
-        if self.btn_run['state'] == tk.DISABLED: return None # stop!
-        self.logger.info('start')
+        if not self.start_state(State.RUNNING):
+            self.logger.warning('tried to start running with state %s!',self.get_state())
+            return # stop!
+        self.logger.info('start by %s','shortcut' if evt else 'click')
         
-        if self.actions is None: return
-        for i in self.actions.to_json():
+        self.end_state(State.RUNNING)
+        
+        if self.master.actions is None: return
+        for i in self.master.actions.to_json():
             print(i)
-
-
-
-
-
-
+        
+#===============================================================================
+# run main
+#===============================================================================
+if __name__ == '__main__': main.main()
 
 
 
