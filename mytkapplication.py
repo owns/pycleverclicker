@@ -164,12 +164,12 @@ class MyTkMenuBar(tk.Menu,MyLoggingBase):
 
         # MenuBar - File
         file_menu = tk.Menu(self,tearoff=0)
-        file_menu.add_command(label='New',command=self.check_in_menu(parent.not_implemented),
+        file_menu.add_command(label='New',command=self.check_in_menu(self.new),
                               underline=0,accelerator='Ctrl+N')
-        self.bind_all('<Control-n>',self.check_in_menu(parent.not_implemented))
-        file_menu.add_command(label='Open...',command=self.check_in_menu(parent.not_implemented),
+        self.bind_all('<Control-n>',self.check_in_menu(self.new))
+        file_menu.add_command(label='Open...',command=self.check_in_menu(self.open),
                               underline=0,accelerator='Ctrl+O')
-        self.bind_all('<Control-o>',self.check_in_menu(parent.not_implemented))
+        self.bind_all('<Control-o>',self.check_in_menu(self.open))
         file_menu.add_separator()
         file_menu.add_command(label='Save',command=self.check_in_menu(self.save),
                               underline=0,accelerator='Ctrl+S')
@@ -245,8 +245,39 @@ class MyTkMenuBar(tk.Menu,MyLoggingBase):
         self.logger.debug('start by %s','shortcut' if evt else 'click')
         self.master.not_implemented(evt)        
     
+    def new(self,evt=None):
+        self.logger.debug('start by %s','shortcut' if evt else 'click')
+        
+        if self.master.actions:
+            # prompt to clear
+            if messagebox.askokcancel(
+                'Are you sure?',
+                'starting new will clear your current',
+                icon=messagebox.WARNING):
+                self.logger.debug('confirm')
+            else:
+                self.logger.debug('cancel')
+        else:
+            self.logger.debug('no actions to clear')
+    
+    def open(self,evt=None):
+        self.logger.debug('start by %s','shortcut' if evt else 'click')
+        
+        # check there are actions to save
+        if not self.master.actions and not messagebox.askokcancel(
+                'Are you sure?',
+                'the currently actions list to be lost if a new file is opened'):
+            return
+            
+        # try and open
+        
+    
     def save(self,evt=None):
         self.logger.debug('start by %s','shortcut' if evt else 'click')
+        # check there are actions to save
+        if not self.master.actions:
+            messagebox.showwarning('Unavailable', 'no actions currently loaded to save.')
+            return
         
         # saveAs if no file
         if self._fullname is None: return self.saveAs(evt=evt)
@@ -267,6 +298,10 @@ class MyTkMenuBar(tk.Menu,MyLoggingBase):
         
     def saveAs(self,evt=None):
         self.logger.debug('start by %s','shortcut' if evt else 'click')
+        # check there are actions to save
+        if not self.master.actions:
+            messagebox.showwarning('Unavailable', 'no actions currently loaded to save.')
+            return
         
         # create default folder if needed
         init_fd = self.get_resource_fd('scripts')
