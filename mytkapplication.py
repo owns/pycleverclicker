@@ -156,7 +156,8 @@ class MyTkMenuBar(tk.Menu,MyLoggingBase):
                          '\nCreated: 2017-03-19'+
                          '\nModified: '+datetime.datetime.fromtimestamp(os.path.getmtime(__file__)).strftime('%Y-%m-%d')+
                          '')
-    _fullname = None
+    __fullname = None # the current actions save file
+    __id = None # the id for .master.actions
     
     def __init__(self, parent):
         MyLoggingBase.__init__(self,name='menubar')
@@ -264,12 +265,27 @@ class MyTkMenuBar(tk.Menu,MyLoggingBase):
         self.logger.debug('start by %s','shortcut' if evt else 'click')
         
         # check there are actions to save
-        if not self.master.actions and not messagebox.askokcancel(
-                'Are you sure?',
-                'the currently actions list to be lost if a new file is opened'):
-            return
-            
-        # try and open
+#         if not self.master.actions and not messagebox.askokcancel(
+#                 'Are you sure?',
+#                 'the current actions list to be lost if a new file is opened'):
+#             return
+        
+        # get the default or old file selected
+        init_fd, init_file = self._get_fd_file()
+        
+        # prompt for save file
+        fullname = filedialog.askopenfilename(
+            title='Open'+(' - current recording will be lost!' if self.master.actions else ''),
+            parent=self.master,
+            initialdir=init_fd,
+            initialfile=init_file,
+            filetypes = [('text files', '.txt'),('all files', '.*')],
+            defaultextension='.txt')
+        # if a filename was selected
+        if fullname:
+            # try to load the fullname
+            self.load_script(fullname)
+        else: self.logger.debug('save dismissed')
         
     
     def save(self,evt=None):
@@ -280,10 +296,11 @@ class MyTkMenuBar(tk.Menu,MyLoggingBase):
             return
         
         # saveAs if no file
-        if self._fullname is None: return self.saveAs(evt=evt)
+        if self._get_fullname() is None: return self.saveAs(evt=evt)
         
         # open save file for writing
-        with open(self._fullname,mode='w') as w:
+        fullname = self._get_fullname()
+        with open(fullname,mode='w') as w:
             # save options
             w.write('# settings\n')
             w.write(json.dumps(self.master.settings, sort_keys=True)+'\n')
@@ -294,7 +311,7 @@ class MyTkMenuBar(tk.Menu,MyLoggingBase):
                 w.write(json.dumps(a, sort_keys=True)+'\n')
         
         # done!
-        self.logger.info('saved to %s',self._fullname)        
+        self.logger.info('saved to %s',fullname)
         
     def saveAs(self,evt=None):
         self.logger.debug('start by %s','shortcut' if evt else 'click')
@@ -303,26 +320,112 @@ class MyTkMenuBar(tk.Menu,MyLoggingBase):
             messagebox.showwarning('Unavailable', 'no actions currently loaded to save.')
             return
         
-        # create default folder if needed
-        init_fd = self.get_resource_fd('scripts')
-        if not os.path.exists(init_fd): os.makedirs(init_fd)
+        # get the default or old file selected
+        init_fd, init_file = self._get_fd_file()
         
         # prompt for save file
         fullname = filedialog.asksaveasfilename(
             #title='',
             parent=self.master,
             initialdir=init_fd,
-            initialfile='MyScript.txt',
+            initialfile=init_file,
             filetypes = [('text files', '.txt'),('all files', '.*')],
             defaultextension='.txt')
         # if a filename was selected
         if fullname:
             self.logger.debug('selected "%s"',fullname)
             # set fullname
-            self._fullname = fullname
+            self._set_fullname(fullname)
             # do the saving
             self.save(evt=evt)
         else: self.logger.debug('save dismissed')
+    
+    def load_script(self, fullname):
+        self.logger.debug('trying "%s"',fullname)
+        
+        section = None
+        settings = self.master.settings
+        actions = MyInputData()
+        try:
+            with open(fullname,'r') as r:
+                # for each none empty line (removing the \n at the end)
+                for ind,line in ((ind,line.rstrip()) 
+                                 for ind,line in enumerate(r)
+                                 if line.rstrip()):
+                    # switch mode?
+                    if line == '# settings':
+                        section = 'settings'
+                    elif line == '# actions':
+                        section = 'actions'
+                    else:
+                        # handle json
+                        print(section,line)
+                        d = json.loads(line)
+                        if section == 'settings': settings.update(d)
+                        if section == 'actions':
+                            if ('name' in d 
+                                and 'pressed' in d
+                                and 'time' in d
+                                and 'type' in d):
+                                actions.append(d)
+                            else:
+                                raise KeyError('missing an action key at line '+
+                                               (ind+1)+': name, pressed, time, type')
+        except IOError as e:
+            self.logger.warning('IOError! %r',e)
+            messagebox.showwarning('IO Error',
+                                   'Unable to load file, {0!r}'.format(e))
+        except KeyError as e:
+            self.logger.warning('KeyError! %r',e)
+            messagebox.showwarning('Parsing Error',
+                                   'Unable to load file, {0!r}'.format(e))
+        except Exception as e:  #pylint: disable=broad-except
+            self.logger.warning('error! %r',e)
+            messagebox.showwarning('Unhandled Exception',
+                                   'Unable to load file, {0}.\n{1}'.format(fullname,e))
+        else:
+            self.logger.info('file loaded %d actions',len(actions))
+            # success - make current
+            self.master.settings.update(settings)
+            self.master.actions = actions
+            self._set_fullname(fullname) # track filename used
+            # inform user
+            messagebox.showinfo('File loaded',
+                                   'script loaded, {0}.'.format(fullname))
+
+#===============================================================================
+#--- hidden methods    
+#===============================================================================
+    def _clear_fullname(self):
+        self.__fullname = None
+        self.__id = None
+        self.master.actions = None
+        
+    def _get_fullname(self):
+        if self.__fullname and self.__id:
+            if self.__id == id(self.master.actions):
+                return self.__fullname
+            else:
+                self.__fullname = None
+                self.__id = None
+        return None
+    
+    def _get_fd_file(self):
+        fullname = self._get_fullname()
+        if fullname:
+            init_fd = os.path.dirname(fullname)
+            init_file = os.path.basename(fullname)
+        else:
+            # create default folder if needed
+            init_fd = self.get_resource_fd('scripts')
+            if not os.path.exists(init_fd): os.makedirs(init_fd)
+            init_file = 'MyScript.txt'
+        return init_fd,init_file
+    
+    def _set_fullname(self,fullname):
+        self.__id = id(self.master.actions)
+        self.__fullname = fullname
+    
 
 class MyTkStatusBar(ttk.Frame,MyLoggingBase):
     """status bar"""
