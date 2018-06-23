@@ -9,7 +9,7 @@ store,export,import,iter through scripts
 import json
 from packages.pymybase.myloggingbase import MyLoggingBase
 
-class MyInputData(list,MyLoggingBase):
+class MyData(list,MyLoggingBase):
     """class to hold input value - to be passed around"""
 
     def __init__(self, *args,**keys):

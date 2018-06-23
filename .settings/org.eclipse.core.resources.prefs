@@ -1,7 +1,8 @@
 eclipse.preferences.version=1
 encoding//packages/pymybase/__init__.py=utf-8
 encoding/main.pyw=utf-8
-encoding/myinputdata.py=utf-8
-encoding/myinputrecorder.py=utf-8
+encoding/mydata.py=utf-8
+encoding/myplayer.py=utf-8
+encoding/myrecorder.py=utf-8
 encoding/mysettingsdialog.py=utf-8
 encoding/mytkapplication.py=utf-8

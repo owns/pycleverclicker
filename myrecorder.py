@@ -12,7 +12,7 @@ from pynput import mouse, keyboard
 
 from packages.pymybase.myloggingbase import MyLoggingBase
 
-class MyInputRecorder(Thread,MyLoggingBase):
+class MyRecorder(Thread,MyLoggingBase):
     """handle recording mouse and keyboard input"""
     
     PRECISION = 4

@@ -8,8 +8,8 @@ Created on 2017-03-19
 
 from packages.pymybase.myloggingbase import MyLoggingBase
 import main
-from myinputrecorder import MyInputRecorder
-from myinputdata import MyInputData
+from myrecorder import MyRecorder
+from mydata import MyData
 from mysettingsdialog import MySettingsDialog
 import tkinter as tk
 import tkinter.ttk as ttk
@@ -345,7 +345,7 @@ class MyTkMenuBar(tk.Menu,MyLoggingBase):
         
         section = None
         settings = self.master.settings
-        actions = MyInputData()
+        actions = MyData()
         try:
             with open(fullname,'r') as r:
                 # for each none empty line (removing the \n at the end)
@@ -359,7 +359,6 @@ class MyTkMenuBar(tk.Menu,MyLoggingBase):
                         section = 'actions'
                     else:
                         # handle json
-                        print(section,line)
                         d = json.loads(line)
                         if section == 'settings': settings.update(d)
                         if section == 'actions':
@@ -565,16 +564,18 @@ class MyTkMainFrame(ttk.Frame,MyLoggingBase):
         for i in self.list_actions.get_children():
             self.list_actions.delete(i)
         # re-set list of actions
-        self.master.actions = MyInputData()
+        self.master.actions = MyData()
         # create recorder queue
         self.recorder_queue = queue.Queue()
         # create and start recorder
-        self.recorder = MyInputRecorder(root=self,actions_queue=self.recorder_queue)
+        self.recorder = MyRecorder(root=self,actions_queue=self.recorder_queue)
         self.recorder.start()
         # monitor the queue
         self.after(100,self.handle_record_action)
 
     def handle_record_action(self):
+        # stopped?
+        if not self.recorder: return # stop
         # anything in queue to process?
         not_empty = True
         while not_empty:
@@ -615,6 +616,16 @@ class MyTkMainFrame(ttk.Frame,MyLoggingBase):
             self.recorder.stop()
             self.recorder.join()
         self.recorder = None
+        self.recorder_queue = None
+        
+        # if clicked, remove last, clicking "stop recording"
+        if not evt:
+            print(len(self.master.actions))
+            for i in self.master.actions.to_json():
+                print(i)
+        
+        
+        self.after(100,lambda: print(len(self.master.actions)))
         
         self.end_state(State.RECORDING)
     
@@ -629,17 +640,47 @@ class MyTkMainFrame(ttk.Frame,MyLoggingBase):
 #===========================================================================
     def run(self,evt=None):
         """ run currently loaded script..."""
+        
+        # actions to run?
+        if not self.master.actions:
+            self.logger.warning('no actions to run!')
+            messagebox.showwarning('No Actions', 'No actions currently loaded.  Either start a recording or load a script.')
+            return # stop
+            
+        # 
+        #if not self.get_state(): self.start_recording(evt)
+        #elif self.can_end_state(State.RECORDING): self.stop_recording(evt)
+        #else: self.logger.warning('cannot record - state is %s',self.get_state())
+        
+        
+        
         if not self.start_state(State.RUNNING):
             self.logger.warning('tried to start running with state %s!',self.get_state())
             return # stop!
         self.logger.info('start by %s','shortcut' if evt else 'click')
         
+        # run
+        if self.master.actions:
+            for i,action in enumerate(self.master.actions):
+                print(i,json.dumps(action, sort_keys=True, separators=(',', ':')))
+        
+        # stop
         self.end_state(State.RUNNING)
-        
-        if self.master.actions is None: return
-        for i in self.master.actions.to_json():
-            print(i)
-        
+    
+    
+    def start_running(self,evt=None):
+        """ run currently loaded script..."""
+        if not self.start_state(State.RUNNING):
+            self.logger.warning('tried to start running with state %s!',self.get_state())
+            return # stop!
+        self.logger.info('start by %s','shortcut' if evt else 'click')
+    
+    def stop_running(self,evt=None):
+        """ run currently loaded script..."""
+        if not self.start_state(State.RUNNING):
+            self.logger.warning('tried to start running with state %s!',self.get_state())
+            return # stop!
+        self.logger.info('start by %s','shortcut' if evt else 'click')
 #===============================================================================
 # run main
 #===============================================================================
