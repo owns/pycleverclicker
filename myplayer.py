@@ -7,7 +7,8 @@ Created on 2017-03-26
 """
 
 import time
-from threading import Thread, Lock
+import random
+from threading import Thread, Event
 from pynput import mouse, keyboard
 
 from packages.pymybase.myloggingbase import MyLoggingBase
@@ -16,32 +17,29 @@ class MyPlayer(Thread,MyLoggingBase):
     """play recording mouse and keyboard inputs"""
     
     PRECISION = 4
-    __continue_running = True
-    __queue = None
+    __evt = None
     __root = None
-    __time_lock = None
-    __key_lock = None
-    __pressed_keys = None
-    __last_time = None
-    log_clicks = True
-    log_keys = True
+    __queue = None
+    __actions = None
+    __settings = None
 
-    def __init__(self,root, actions_queue,*args,**keys):
+    def __init__(self,root, actions_queue, actions, settings, *args,**keys):
         MyLoggingBase.__init__(self,*args,**keys)
         Thread.__init__(self,*args,**keys)
 
         self.__root = root
+        self.__evt = Event()
         self.__queue = actions_queue
-        self.__time_lock = Lock()
-        self.__key_lock = Lock()
+        self.__actions = actions
+        self.__settings = settings
     
     #===========================================================================
     # STOP
     #===========================================================================
     def stop(self):
         """ start stopping ..."""
+        self.__evt.set()
         self.logger.info('told to stop ...')
-        self.__continue_running = False
 
     #===========================================================================
     # RUN
@@ -49,26 +47,63 @@ class MyPlayer(Thread,MyLoggingBase):
     def run(self):
         """ do work here """
         self.logger.info('started')
-        self.__pressed_keys = dict()
-        self.__last_time = None
-
+        
         #=======================================================================
-        # # start listeners
+        # start controllers
         #=======================================================================
+        m = mouse.Controller()
+        k = keyboard.Controller()
+        self.logger.debug('keyboard and mouse controller set')
+        
+        #=======================================================================
+        # do automation
+        #=======================================================================
+        # wait delay
+        repeat =  self.__settings['repeat limit']
+        start_delay = self.__settings['start delay']
+        start_var = self.__settings['start variance']
+        action_var = self.__settings['action variance']
+        
+        # keep going
+        run_count = 1
+        while not self.__evt.is_set():
+            # start delay?
+            t = start_delay + random.uniform(-start_var, start_var)
+            if t > 0:
+                self.logger.info('%03d sleeping start delay, %.3f', run_count, t)
+                if self.__evt.wait(t): break
+            else:
+                self.logger.info('%03d sleeping start delay, %.3f', 
+                                 run_count, start_delay)
+            
+            # go though each action
+            for action in self.__actions:
+                t = action['time'] + random.uniform(-action_var, action_var)
+                
+                # wait if needed
+                if t > 0:
+                    if self.__evt.wait(t): break
+                
+                # do action
+                if action['type'] == 'keyboard':
+                    self.logger.info('%.3f %s released after %.1f',
+                                     action['time'],action['name'],action['pressed'])
+                elif action['type'] == 'mouse':
+                    self.logger.info('%.3f %s click at %s',
+                                     action['time'],action['name'],action['pos'])
+                else:
+                    self.logger.error('unable to perform action type "%s"',action['type'])
+            
+            # continue?
+            if run_count == repeat: break
+            run_count += 1
+        
         '''
-        list_m = mouse.Listener(on_click=self.on_click)
-        list_m.start()
-        list_m.wait()
-        list_k = keyboard.Listener(on_release=self.on_release,
-                                   on_press=self.on_press)
-        list_k.start()
-        list_k.wait()
-
         #=======================================================================
         # wait to stop
         #=======================================================================
         while self.__continue_running: time.sleep(.5)
-
+        
         #=======================================================================
         # stop listeners
         #=======================================================================

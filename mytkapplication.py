@@ -8,8 +8,9 @@ Created on 2017-03-19
 
 from packages.pymybase.myloggingbase import MyLoggingBase
 import main
-from myrecorder import MyRecorder
 from mydata import MyData
+from myrecorder import MyRecorder
+from myplayer import MyPlayer
 from mysettingsdialog import MySettingsDialog
 import tkinter as tk
 import tkinter.ttk as ttk
@@ -28,7 +29,7 @@ class State(Enum):
 
 class MyTkApplication(tk.Tk,MyLoggingBase):
     """The Tk.Frame"""
-    DEFAULT_SETTINGS = {'repeat limit':0,
+    DEFAULT_SETTINGS = {'repeat limit':0, # seconds
                         'start delay':12,
                         'start variance':0,
                         'action variance':0}
@@ -127,12 +128,14 @@ class MyTkApplication(tk.Tk,MyLoggingBase):
         """run on quit  """
         self.logger.debug('cleaning ...')
         
-        # stop recorder if running
-        if self.main_frame.recorder:
+        # stop recorder/player if running
+        if self.main_frame.actioner:
             #messagebox.showerror('Not Implemented', 'This feature has net yet been built!')
-            if self.main_frame.recorder.is_alive():
-                self.main_frame.recorder.stop()
-                self.main_frame.recorder.join()
+            if self.main_frame.actioner.is_alive():
+                self.main_frame.actioner.stop()
+                self.main_frame.actioner.join()
+        
+        self.main_frame.actions_queue = None
         
         # save settings
         saved = self.write_file_key_values(
@@ -286,7 +289,6 @@ class MyTkMenuBar(tk.Menu,MyLoggingBase):
             # try to load the fullname
             self.load_script(fullname)
         else: self.logger.debug('save dismissed')
-        
     
     def save(self,evt=None):
         self.logger.debug('start by %s','shortcut' if evt else 'click')
@@ -469,8 +471,8 @@ class MyTkMainFrame(ttk.Frame,MyLoggingBase):
     LB_MAX_SIZE = 6
     list_actions = None
     
-    recorder = None
-    recorder_queue = None
+    actioner = None
+    actions_queue = None
     
     def __init__(self, parent):
         MyLoggingBase.__init__(self, name='mainframe')
@@ -566,20 +568,20 @@ class MyTkMainFrame(ttk.Frame,MyLoggingBase):
         # re-set list of actions
         self.master.actions = MyData()
         # create recorder queue
-        self.recorder_queue = queue.Queue()
+        self.actions_queue = queue.Queue()
         # create and start recorder
-        self.recorder = MyRecorder(root=self,actions_queue=self.recorder_queue)
-        self.recorder.start()
+        self.actioner = MyRecorder(root=self,actions_queue=self.actions_queue)
+        self.actioner.start()
         # monitor the queue
         self.after(100,self.handle_record_action)
 
     def handle_record_action(self):
         # stopped?
-        if not self.recorder: return # stop
+        if not self.actioner: return # stop
         # anything in queue to process?
         not_empty = True
         while not_empty:
-            try: i = self.recorder_queue.get_nowait()
+            try: i = self.actions_queue.get_nowait()
             except queue.Empty: not_empty = False
             else:
                 # log to console
@@ -591,16 +593,16 @@ class MyTkMainFrame(ttk.Frame,MyLoggingBase):
                                  i['time'],i['name'],i['pressed']) # do work
                 # add to list
                 self.master.actions.append(i)
-                self.recorder_queue.task_done()
+                self.actions_queue.task_done()
 
         # continue?
-        if self.recorder:
+        if self.actioner:
             self.after(100,self.handle_record_action)
 
     def stop_recording(self,evt=None): #@UnusedVariable #pylint: disable=unused-argument
         """stop recording actions"""
         if not self.can_end_state(State.RECORDING):
-            self.logger.warning('tried to stop recording while not recording!')
+            self.logger.warning('tried to stop recording while %s!',self.get_state())
             return # stop!
         
         self.logger.info('stop recording by %s ...','shortcut' if evt else 'click')
@@ -612,20 +614,11 @@ class MyTkMainFrame(ttk.Frame,MyLoggingBase):
         self.master.set_status('Recorder Stopped') # won't show till after b/c join
 
         # stop recorder - terminate and stop
-        if self.recorder and self.recorder.is_alive():
-            self.recorder.stop()
-            self.recorder.join()
-        self.recorder = None
-        self.recorder_queue = None
-        
-        # if clicked, remove last, clicking "stop recording"
-        if not evt:
-            print(len(self.master.actions))
-            for i in self.master.actions.to_json():
-                print(i)
-        
-        
-        self.after(100,lambda: print(len(self.master.actions)))
+        if self.actioner and self.actioner.is_alive():
+            self.actioner.stop()
+            self.actioner.join()
+        self.actioner = None
+        self.actions_queue = None
         
         self.end_state(State.RECORDING)
     
@@ -646,41 +639,82 @@ class MyTkMainFrame(ttk.Frame,MyLoggingBase):
             self.logger.warning('no actions to run!')
             messagebox.showwarning('No Actions', 'No actions currently loaded.  Either start a recording or load a script.')
             return # stop
-            
-        # 
-        #if not self.get_state(): self.start_recording(evt)
-        #elif self.can_end_state(State.RECORDING): self.stop_recording(evt)
-        #else: self.logger.warning('cannot record - state is %s',self.get_state())
         
+        # try to run or stop running
+        if not self.get_state(): self.start_running(evt)
+        elif self.can_end_state(State.RUNNING): self.stop_running(evt)
+        else: self.logger.warning('cannot run - state is %s',self.get_state())
         
-        
-        if not self.start_state(State.RUNNING):
-            self.logger.warning('tried to start running with state %s!',self.get_state())
-            return # stop!
-        self.logger.info('start by %s','shortcut' if evt else 'click')
-        
-        # run
-        if self.master.actions:
-            for i,action in enumerate(self.master.actions):
-                print(i,json.dumps(action, sort_keys=True, separators=(',', ':')))
-        
-        # stop
-        self.end_state(State.RUNNING)
-    
-    
     def start_running(self,evt=None):
         """ run currently loaded script..."""
-        if not self.start_state(State.RUNNING):
-            self.logger.warning('tried to start running with state %s!',self.get_state())
+        if not self.master.actions or not self.start_state(State.RUNNING):
+            self.logger.warning('tried to start running while %s!',self.get_state())
             return # stop!
-        self.logger.info('start by %s','shortcut' if evt else 'click')
+        
+        self.logger.info('start running by %s ...','shortcut' if evt else 'click')
+        
+        # format and prep
+        self.btn_run.config(text=' '.join(
+            ['Stop']+self.btn_run['text'].split(' ')[1:]))
+        self.btn_record.config(state=tk.DISABLED)
+        #self.set_next_action('',to_log=False)
+        self.master.set_status('Player Active')
+        
+        # --- start recorder
+        # clear console
+        for i in self.list_actions.get_children():
+            self.list_actions.delete(i)
+        # create runner queue
+        self.actions_queue = queue.Queue()
+        # create and start recorder
+        self.actioner = MyPlayer(root=self,actions_queue=self.actions_queue,
+                                 actions=self.master.actions,settings=self.master.settings)
+        self.actioner.start()
+        # monitor the queue
+        self.after(100,self.handle_run_action)
+    
+    def handle_run_action(self):
+        # stopped?
+        if not self.actioner: return # stop
+        # anything in queue to process?
+        not_empty = True
+        while not_empty:
+            try: i = self.actions_queue.get_nowait()
+            except queue.Empty: not_empty = False
+            else:
+                # update log
+                self.logger.debug('%r',i)
+                #self.master.actions[i]
+                self.actions_queue.task_done()
+
+        # continue?
+        if self.actioner:
+            self.after(100,self.handle_record_action)
     
     def stop_running(self,evt=None):
-        """ run currently loaded script..."""
-        if not self.start_state(State.RUNNING):
-            self.logger.warning('tried to start running with state %s!',self.get_state())
+        """ stop running currently loaded script..."""
+        if not self.master.actions or not self.can_end_state(State.RUNNING):
+            self.logger.warning('tried to stop running while %s!',self.get_state())
             return # stop!
-        self.logger.info('start by %s','shortcut' if evt else 'click')
+        
+        self.logger.info('stop running by %s ...','shortcut' if evt else 'click')
+        
+        # format and prep
+        self.btn_run.config(text=' '.join(
+            ['Run']+self.btn_run['text'].split(' ')[1:]))
+        self.btn_record.config(state=tk.NORMAL)
+        self.master.set_status('Player Stopped') # won't show till after b/c join
+
+        # stop recorder - terminate and stop
+        if self.actioner and self.actioner.is_alive():
+            self.actioner.stop()
+            self.actioner.join()
+        self.actioner = None
+        self.actions_queue = None
+        
+        
+        self.end_state(State.RUNNING)
+        
 #===============================================================================
 # run main
 #===============================================================================
