@@ -6,7 +6,6 @@ Created on 2017-03-26
 <desc here>
 """
 
-import time
 import random
 from threading import Thread, Event
 from pynput import mouse, keyboard
@@ -81,16 +80,24 @@ class MyPlayer(Thread,MyLoggingBase):
                 t = action['time'] + random.uniform(-action_var, action_var)
                 
                 # wait if needed
-                if t > 0:
-                    if self.__evt.wait(t): break
+                if t > 0 and self.__evt.wait(t): break
                 
                 # do action
+                action_name = action['name']
                 if action['type'] == 'keyboard':
+                    t = action['pressed']
                     self.logger.info('%.3f %s released after %.1f',
-                                     action['time'],action['name'],action['pressed'])
+                                     action['time'],action_name,t)
+                    k.press(action_name if len(action_name)==1 else keyboard.Key[action_name]) # press
+                    if t > 0 and self.__evt.wait(t): break # hold press
+                    k.release(action_name if len(action_name)==1 else keyboard.Key[action_name]) # release
+                    
                 elif action['type'] == 'mouse':
                     self.logger.info('%.3f %s click at %s',
-                                     action['time'],action['name'],action['pos'])
+                                     action['time'],action_name,action['pos'])
+                    m.position = action['pos'] # move
+                    m.click(mouse.Button[action_name]) # click
+                    
                 else:
                     self.logger.error('unable to perform action type "%s"',action['type'])
             
