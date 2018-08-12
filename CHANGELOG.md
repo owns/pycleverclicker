@@ -8,6 +8,7 @@
 - commit messaged add #xx to link to isssue and prefix w/ 'close' to close - merge to master?!
 - export!
 - import!
+- run!
 ## Changed
 - refactored following pylint
 - pymybase located in packages module
@@ -16,7 +17,7 @@
 - press and time in script precision 4 decimals
 - refactored - removed "input" from class names
 ## Bug
-- MySettingsDialog not capture all (can still drap root and get's shortcuts???
+- MySettingsDialog not capture all (can still drop root and get's shortcuts???)
 ## Fixed
 - no keyboard long hold due to keyboard - increase C/S override caused issues
 - pressing enter on settings dialog at start of recording isn't the first action!

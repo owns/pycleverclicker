@@ -21,6 +21,7 @@ import queue
 import os
 from enum import Enum
 import json
+import time
 
 class State(Enum):
     MENU = 'in menu'
@@ -470,8 +471,10 @@ class MyTkMainFrame(ttk.Frame,MyLoggingBase):
     btn_run = None
     LB_MAX_SIZE = 6
     list_actions = None
+    list_ids = None
     
     actioner = None
+    actioner_mem = None
     actions_queue = None
     
     def __init__(self, parent):
@@ -506,6 +509,7 @@ class MyTkMainFrame(ttk.Frame,MyLoggingBase):
         # console
         lf = ttk.LabelFrame(self,text='Console:')
         # http://infohost.nmt.edu/tcc/help/pubs/tkinter/web/ttk-Treeview.html
+        self.list_ids = list()
         self.list_actions = ttk.Treeview(lf,
                                          height=self.LB_MAX_SIZE,
                                          selectmode='none',
@@ -563,8 +567,9 @@ class MyTkMainFrame(ttk.Frame,MyLoggingBase):
 
         # --- start recorder
         # clear console
-        for i in self.list_actions.get_children():
-            self.list_actions.delete(i)
+        for item_id in self.list_ids:
+            self.list_actions.delete(item_id)
+        self.list_ids = list()
         # re-set list of actions
         self.master.actions = MyData()
         # create recorder queue
@@ -586,11 +591,11 @@ class MyTkMainFrame(ttk.Frame,MyLoggingBase):
             else:
                 # log to console
                 if i['type'] == 'mouse':
-                    self.add_log('{0:.3f} {1} click at {2!s}',
-                                 i['time'],i['name'],i['pos']) # do work
+                    self.add_rec_log('{0:.3f} {1} click at {2!s}',
+                        i['time'],i['name'],i['pos']) # do work
                 else:
-                    self.add_log('{0:.3f} {1} released after {2:.1f}',
-                                 i['time'],i['name'],i['pressed']) # do work
+                    self.add_rec_log('{0:.3f} {1} released after {2:.1f}',
+                        i['time'],i['name'],i['pressed']) # do work
                 # add to list
                 self.master.actions.append(i)
                 self.actions_queue.task_done()
@@ -622,11 +627,20 @@ class MyTkMainFrame(ttk.Frame,MyLoggingBase):
         
         self.end_state(State.RECORDING)
     
-    def add_log(self,msg,*args):
+    def add_rec_log(self,msg,*args):
         """ insert text to the log dialog """
-        self.list_actions.insert('', 0, open=True, #text=''
-                                 values=('{0:03d}'.format(len(self.master.actions)+1),
-                                         msg.format(*args),))
+        item_id = self.list_actions.insert('', 0, open=True, #text=''
+            values=('{0:03d}'.format(len(self.master.actions)+1),
+                    msg.format(*args),))
+        # add id to list
+        self.list_ids.append(item_id)
+        
+    def add_run_log(self,run_text,msg,*args):
+        """ insert text to the log dialog """
+        item_id = self.list_actions.insert('', 0, open=True, #text=''
+            values=(run_text, msg.format(*args),))
+        # add id to list
+        self.list_ids.append(item_id)
     
 #===========================================================================
 #--- Run
@@ -662,11 +676,14 @@ class MyTkMainFrame(ttk.Frame,MyLoggingBase):
         
         # --- start recorder
         # clear console
-        for i in self.list_actions.get_children():
-            self.list_actions.delete(i)
+        #for i in self.list_actions.get_children():
+        for item_id in self.list_ids:
+            self.list_actions.delete(item_id)
+        self.list_ids = list()
         # create runner queue
         self.actions_queue = queue.Queue()
         # create and start recorder
+        self.actioner_mem = None
         self.actioner = MyPlayer(root=self,actions_queue=self.actions_queue,
                                  actions=self.master.actions,settings=self.master.settings)
         self.actioner.start()
@@ -682,14 +699,33 @@ class MyTkMainFrame(ttk.Frame,MyLoggingBase):
             try: i = self.actions_queue.get_nowait()
             except queue.Empty: not_empty = False
             else:
+                self.actioner_mem = i
+                self.actioner_mem['last'] = 0
                 # update log
                 self.logger.debug('%r',i)
                 #self.master.actions[i]
                 self.actions_queue.task_done()
+            
+            # update "Next Action" if needed
+            if self.actioner_mem:
+                
+                # make sure console isn't over 10*LB_MAX_SIZE
+                while len(self.list_ids) > 9*self.LB_MAX_SIZE:
+                    item_id = self.list_ids.pop(0)
+                    self.list_actions.delete(item_id)
+                
+                cur = time.time()
+                # if not last updated in the last sec, add log 
+                if not_empty or cur >= 1+self.actioner_mem['last']:
+                    self.actioner_mem['last'] = cur
+                    # populated "Next Action"
+                    self.add_run_log(self.actioner_mem['run'],
+                                     self.actioner_mem['msg'],
+                                     int(self.actioner_mem['time'] - cur))
 
         # continue?
         if self.actioner:
-            self.after(100,self.handle_record_action)
+            self.after(100,self.handle_run_action)
     
     def stop_running(self,evt=None):
         """ stop running currently loaded script..."""
